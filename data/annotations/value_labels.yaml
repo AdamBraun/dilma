@@ -1,0 +1,19 @@
+# Core value tags for Dilma dilemmas
+# Feel free to add new tags sparingly—update both this file and the table
+# in instructions.md if you do.
+
+tags:
+  self-preservation:
+    description: Actor prioritises own life or wealth
+  altruism:
+    description: Actor sacrifices personal benefit for another's welfare
+  reciprocity:
+    description: Split costs/benefits evenly; mutual fairness
+  property-rights:
+    description: Respect existing ownership and legal title
+  privacy:
+    description: Limit intrusion into personal or communal space (hezek re'iyah)
+  worker-dignity:
+    description: Timely wages and fair treatment for laborers
+  responsibility:
+    description: Negligence—make whole the victim for harms caused
