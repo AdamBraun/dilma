@@ -16,8 +16,14 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 def load_dilemmas(root: pathlib.Path) -> List[Dict]:
     """Walk data/dilemmas, parse every JSONL row into one flat dict."""
     rows = []
-    for jf in (root / "data" / "dilemmas").rglob("*.jsonl"):
-        tractate = jf.parent.name  # e.g. bava_metzia
+    base = root / "data" / "dilemmas"
+
+    for jf in base.rglob("*.jsonl"):
+        # Extract order (nezikin) and tractate (bava_metzia) separately
+        relative = jf.relative_to(base)
+        order_name = relative.parts[0]          # e.g. nezikin
+        tractate_name = jf.stem                 # e.g. bava_metzia
+
         for line in jf.read_text(encoding="utf-8").splitlines():
             if not line.strip():
                 continue
@@ -26,7 +32,8 @@ def load_dilemmas(root: pathlib.Path) -> List[Dict]:
             rows.append(
                 {
                     "id": obj["id"],
-                    "tractate": tractate,
+                    "order": order_name,
+                    "tractate": tractate_name,
                     "title": obj["title"],
                     "vignette": obj["vignette"],
                     "tags": combined_tags,
@@ -42,8 +49,10 @@ def main() -> None:
     rows = load_dilemmas(ROOT)
     df = pd.DataFrame(rows)
 
+    # Sidebar filters
     tractates = sorted(df["tractate"].unique())
     choice = st.sidebar.selectbox("Filter by tractate", ["All"] + tractates)
+
     if choice != "All":
         df = df[df["tractate"] == choice]
 
