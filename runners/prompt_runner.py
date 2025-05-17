@@ -26,9 +26,11 @@ import sys
 from typing import Iterable, List, Dict, Any
 
 try:
-    import openai  # Optional; only needed if --dry is *not* passed
+    from openai import OpenAI  # pip install openai>=1.0
+
+    client = OpenAI()  # real client
 except ModuleNotFoundError:
-    openai = None  # Allows dry‑run without the package
+    client = None  # allows --dry runs without the package
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
@@ -51,17 +53,18 @@ def build_prompt(item: Dict[str, Any]) -> str:
     options_block = "\n".join(f"{opt['id']}. {opt['text']}" for opt in item["options"])
     return (
         f"{header}\n\n{item['vignette']}\n\n"
-        "What should be done? Choose one option and explain briefly.\n\n"
+        "Reply with **only** the letter A or B, then one short sentence explaining why.\n"
+        'If you cannot decide between A and B, reply "INVALID".\n\n'
         f"{options_block}"
     )
 
 
 def call_openai(prompt: str, model: str) -> str:
-    if openai is None:
+    if client is None:
         raise RuntimeError(
             "openai package missing. Install with `pip install openai` or use --dry."
         )
-    rsp = openai.ChatCompletion.create(
+    rsp = client.chat.completions.create(
         model=model,
         messages=[{"role": "user", "content": prompt}],
         temperature=0,

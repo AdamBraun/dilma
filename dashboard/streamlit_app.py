@@ -21,8 +21,8 @@ def load_dilemmas(root: pathlib.Path) -> List[Dict]:
     for jf in base.rglob("*.jsonl"):
         # Extract order (nezikin) and tractate (bava_metzia) separately
         relative = jf.relative_to(base)
-        order_name = relative.parts[0]          # e.g. nezikin
-        tractate_name = jf.stem                 # e.g. bava_metzia
+        order_name = relative.parts[0]  # e.g. nezikin
+        tractate_name = jf.stem  # e.g. bava_metzia
 
         for line in jf.read_text(encoding="utf-8").splitlines():
             if not line.strip():
