@@ -148,93 +148,58 @@ axes = {
     "Survival / Welfare": ("self-preservation", "altruism"),
     "Entitlement / Obligation": ("property-rights", "responsibility"),
     "Even-split / Protection": ("reciprocity", "worker-dignity"),
+    "Sacred Life / Instrumental Life": ("sanctity-of-life", "utilitarian"),
+    "Legal Authority / Personal Agency": ("rule-of-law", "vigilantism"),   # or "authority" vs "personal-agency"
+    "Transcendent Norm / Pragmatism": ("religious-duty", "proportionality")
 }
 
-# Build a tidy DataFrame with positive (right) and negative (left) counts
 rows = []
 for axis, (left_tag, right_tag) in axes.items():
+    left_cnt     = run_df["chosen_value_labels"].apply(lambda x: left_tag  in x).sum()
+    right_cnt    = run_df["chosen_value_labels"].apply(lambda x: right_tag in x).sum()
+    invalid_cnt  = run_df["chosen_value_labels"].apply(lambda x: "invalid" in x and
+                                                       left_tag not in x and
+                                                       right_tag not in x).sum()
     rows.append(
-        {
-            "axis": axis,
-            "left_label": left_tag,
-            "right_label": right_tag,
-            "left_count": -tag_counter.get(left_tag, 0),  # negative = left
-            "right_count": tag_counter.get(right_tag, 0),
-        }
+        {"axis": axis,
+         "left":  -left_cnt,          # negative = self-leaning
+         "right":  right_cnt,         # positive = other-leaning
+         "invalid": invalid_cnt}      # keep positive, plot to the right of 'right'
     )
 
 ax_df = pd.DataFrame(rows).set_index("axis")
 
-invalids_total = tag_counter.get("invalid", 0)
-
-if ax_df["left_count"].abs().sum() + ax_df["right_count"].sum() == 0 and invalids_total == 0:
+if not ax_df[["left","right","invalid"]].abs().values.sum():
     st.info("No run data yet for bipolar axes chart.")
 else:
     fig, ax = plt.subplots(figsize=(5, 3))
-    # Plot right (positive) bars
-    right_bars = ax.barh(
-        ax_df.index, ax_df["right_count"], color="#4c72b0", label="Other-leaning"
-    )
-    # Plot left (negative) bars
-    left_bars = ax.barh(
-        ax_df.index, ax_df["left_count"], color="#dd8452", label="Self-leaning"
-    )
 
-    # Add "Invalid" bars, starting from the left edge of the "Self-leaning" segment
-    if invalids_total > 0:
-        # Plot invalid bars one by one to handle the legend label correctly for the series
-        for i, axis_name in enumerate(ax_df.index):
-            current_left_edge = ax_df.loc[axis_name, "left_count"]
-            ax.barh(axis_name, invalids_total, left=current_left_edge, color="#999999", label="Invalid" if i == 0 else "")
+    # plot self-leaning
+    left_bars = ax.barh(ax_df.index, ax_df["left"],
+                        color="#dd8452", label="Self-leaning")
 
-    # Add labels to right_bars
-    for bar in right_bars:
-        width = bar.get_width()
-        if width > 0:  # Only label non-zero bars
-            ax.text(
-                width / 2,
-                bar.get_y() + bar.get_height() / 2.0,
-                f"{width}",
-                ha="center",
-                va="center",
-                fontsize=8,
-                color="white",
-            )
+    # plot other-leaning
+    right_bars = ax.barh(ax_df.index, ax_df["right"],
+                         color="#4c72b0", label="Other-leaning")
 
-    # Add labels to left_bars
-    for bar in left_bars:
-        width = bar.get_width()
-        if width < 0:  # Only label non-zero bars (width is negative here)
-            ax.text(
-                width / 2,
-                bar.get_y() + bar.get_height() / 2.0,
-                f"{abs(width)}",
-                ha="center",
-                va="center",
-                fontsize=8,
-                color="white",
-            )
-    
-    # Add labels to invalid_bars (if they were plotted)
-    if invalids_total > 0:
-        # Re-iterate or access plotted invalid bars to add text
-        # For simplicity, let's recalculate positions based on ax_df as we did for plotting
-        for i, axis_name in enumerate(ax_df.index):
-            current_left_edge = ax_df.loc[axis_name, "left_count"]
-            # y_position needs to match the bar's y position. 
-            # We can get it from the left_bars collection assuming the same order and y-coordinates.
-            y_pos = left_bars[i].get_y() + left_bars[i].get_height() / 2.0
-            ax.text(
-                current_left_edge + invalids_total / 2.0, # Center of the invalid bar segment
-                y_pos,
-                f"{invalids_total}",
-                ha="center",
-                va="center",
-                fontsize=8,
-                color="white", # Assuming white text is okay on #999999 grey
-            )
+    # plot invalid, immediately to the right of the other-leaning segment
+    invalid_bars = ax.barh(ax_df.index,
+                           ax_df["invalid"],
+                           left=ax_df["right"].clip(lower=0),
+                           color="#999999",
+                           label="Invalid")
 
-    # Center line
+    # numeric labels
+    for bars in (left_bars, right_bars, invalid_bars):
+        for bar in bars:
+            w = bar.get_width()
+            if w != 0:
+                ax.text(bar.get_x() + w/2,
+                        bar.get_y() + bar.get_height()/2,
+                        f"{abs(int(w))}",
+                        ha="center", va="center",
+                        fontsize=8, color="white")
+
     ax.axvline(0, color="black", linewidth=0.6)
     ax.set_xlabel("Count of answers")
     ax.legend(loc="lower right")

@@ -205,7 +205,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--results",
         type=pathlib.Path,
-        help="Optional path to LLM results JSONL file to parse for value-label distribution.",
+        help="Optional path to an LLM results JSONL file or a directory containing "
+             "LLM results JSONL files to parse for value-label distribution.",
     )
     args = parser.parse_args()
 
@@ -220,7 +221,32 @@ if __name__ == "__main__":
     # Parse results if the argument is provided
     if args.results:
         all_dilemmas_data = load_all_dilemmas(DILEMMA_DIR)
-        parse_runner_output(args.results, all_dilemmas_data)
+        results_path: pathlib.Path = args.results
+
+        result_files_to_process = []
+        if not results_path.exists():
+            print(f"⚠️ Results path not found: {results_path}. Skipping CSV generation.")
+        elif results_path.is_file():
+            if results_path.suffix == ".jsonl":
+                result_files_to_process.append(results_path)
+            else:
+                print(f"⚠️ Specified results file is not a .jsonl file: {results_path}. Skipping CSV generation.")
+        elif results_path.is_dir():
+            found_files = sorted(list(results_path.glob("*.jsonl")))
+            if not found_files:
+                print(f"⚠️ No .jsonl files found in results directory: {results_path}. Skipping CSV generation.")
+            else:
+                result_files_to_process.extend(found_files)
+        else:
+            print(f"⚠️ Results path is not a valid file or directory: {results_path}. Skipping CSV generation.")
+
+        if not result_files_to_process:
+            print("No result files to process.")
+        else:
+            print(f"Found {len(result_files_to_process)} result file(s) to process.")
+            for results_file_path in result_files_to_process:
+                print(f"Processing results from: {results_file_path}")
+                parse_runner_output(results_file_path, all_dilemmas_data)
 
     if errors:  # Exit with error if dilemma files had issues
         sys.exit(1)
