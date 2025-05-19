@@ -86,11 +86,34 @@ def load_run() -> pd.DataFrame:
 dl_df = load_dilemmas()
 run_df = load_run()
 
+# Sidebar filters
 tractates = sorted(dl_df["tractate"].unique())
-sel = st.sidebar.selectbox("Filter by tractate", ["All"] + tractates)
-if sel != "All":
-    dl_df = dl_df[dl_df["tractate"] == sel]
-    run_df = run_df[run_df["dilemma_id"].isin(dl_df["id"])]
+sel_tractate = st.sidebar.selectbox("Filter by tractate", ["All"] + tractates)
+
+model_names = []
+if "model_name" in run_df.columns:
+    model_names = sorted(run_df["model_name"].unique())
+
+# Add "All" option only if there are models, otherwise selectbox is empty or shows first model.
+# Default to first model if available, or "All" if multiple, or handle empty run_df gracefully.
+if not model_names: # No run data or model_name column missing
+    sel_model = None
+    st.sidebar.info("No model data found in results CSV to filter by.")
+elif len(model_names) == 1:
+    sel_model = model_names[0] # Auto-select if only one model
+    st.sidebar.markdown(f"**Model:** {sel_model} (only one available)")
+else:
+    sel_model = st.sidebar.selectbox("Filter by model", ["All"] + model_names)
+
+# Apply tractate filter
+if sel_tractate != "All":
+    dl_df = dl_df[dl_df["tractate"] == sel_tractate]
+    if not run_df.empty:
+        run_df = run_df[run_df["dilemma_id"].isin(dl_df["id"])]
+
+# Apply model filter (if a model is selected and run_df is not empty)
+if sel_model and sel_model != "All" and not run_df.empty and "model_name" in run_df.columns:
+    run_df = run_df[run_df["model_name"] == sel_model]
 
 # -----------------------------------------------------------------------------
 # Chart 1 — stacked bar of value tags chosen
