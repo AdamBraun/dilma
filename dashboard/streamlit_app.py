@@ -202,7 +202,7 @@ else:
 
     ax.axvline(0, color="black", linewidth=0.6)
     ax.set_xlabel("Count of answers")
-    ax.legend(loc="lower right")
+    ax.legend(loc="upper right")
     st.pyplot(fig)
 
 # -----------------------------------------------------------------------------
