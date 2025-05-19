@@ -47,11 +47,13 @@ def read_jsonl(fp: pathlib.Path):
 def load_dilemmas() -> pd.DataFrame:
     rows: List[Dict] = []
     for jf in DILEMMA_DIR.rglob("*.jsonl"):
-        tract = jf.parent.name
+        order_name = jf.parent.name  # e.g., 'nezikin'
+        tract = jf.stem              # e.g., 'bava_metzia'
         for obj in read_jsonl(jf):
             rows.append(
                 {
                     "id": obj["id"],
+                    "order": order_name,
                     "tractate": tract,
                     "title": obj["title"],
                     "vignette": obj["vignette"],
