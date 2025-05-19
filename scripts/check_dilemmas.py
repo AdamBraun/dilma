@@ -102,7 +102,7 @@ def parse_runner_output(results_file: pathlib.Path, all_dilemmas: dict) -> list:
                 0
             ].upper()  # Get the first word/token
             # Strip common trailing punctuation
-            first_token = first_token.rstrip(".,:")
+            first_token = first_token.rstrip(".,:;")
 
             if first_token == "A":
                 parsed_choice = "A"
