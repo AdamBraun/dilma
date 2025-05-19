@@ -2,17 +2,37 @@
 """Dilma — prompt runner
 
 Usage examples:
-    # Dry‑run: print prompts only
+    # Dry‑run: print prompts for a single file
     python runners/prompt_runner.py \
         --model gpt-4o \
         --dilemmas data/dilemmas/nezikin/bava_metzia.jsonl \
         --dry
 
-    # Real run, save outputs
+    # Dry-run: print prompts for all *.jsonl files in a directory (non-recursive)
+    python runners/prompt_runner.py \
+        --model gpt-4o \
+        --dilemmas data/dilemmas/nezikin/ \
+        --dry
+
+    # Dry-run: print prompts for all *.jsonl files in a directory and its subdirectories
+    python runners/prompt_runner.py \
+        --model gpt-4o \
+        --dilemmas data/dilemmas/ \
+        --recursive \
+        --dry
+
+    # Real run, save outputs from a single file
     OPENAI_API_KEY=... python runners/prompt_runner.py \
         --model gpt-4o \
         --dilemmas data/dilemmas/nezikin/bava_metzia.jsonl \
         --out results/bava_metzia_gpt4o.jsonl
+
+    # Real run, save combined outputs from all *.jsonl in a directory
+    OPENAI_API_KEY=... python runners/prompt_runner.py \
+        --model gpt-4o \
+        --dilemmas data/dilemmas/nezikin/ \
+        --recursive \
+        --out results/all_nezikin_gpt4o.jsonl
 
 The script is intentionally minimal: no batching, retry, or cost tracking.
 """
@@ -73,32 +93,63 @@ def call_openai(prompt: str, model: str) -> str:
 
 
 def run(args: argparse.Namespace) -> None:
-    dilemmas_path = pathlib.Path(args.dilemmas).resolve()
-    if not dilemmas_path.exists():
-        sys.exit(f"❌ File not found: {dilemmas_path}")
+    input_path = pathlib.Path(args.dilemmas).resolve()
+    if not input_path.exists():
+        sys.exit(f"❌ Path not found: {input_path}")
+
+    dilemma_files: List[pathlib.Path] = []
+    if input_path.is_file():
+        if input_path.suffix == ".jsonl":
+            dilemma_files.append(input_path)
+        else:
+            sys.exit(f"❌ Input file is not a .jsonl file: {input_path}")
+    elif input_path.is_dir():
+        if args.recursive:
+            dilemma_files.extend(sorted(input_path.rglob("*.jsonl")))
+        else:
+            dilemma_files.extend(sorted(input_path.glob("*.jsonl")))
+        if not dilemma_files:
+            sys.exit(f"❌ No *.jsonl files found in directory: {input_path}")
+    else:
+        sys.exit(f"❌ Input path is not a file or directory: {input_path}")
 
     out_rows: List[Dict[str, Any]] = []
+    total_processed_dilemmas = 0
 
-    for item in iter_jsonl(dilemmas_path):
-        prompt = build_prompt(item)
+    for dilemmas_path in dilemma_files:
+        print(f"Processing file: {dilemmas_path.relative_to(ROOT)}...")
+        processed_in_file = 0
+        for item in iter_jsonl(dilemmas_path):
+            prompt = build_prompt(item)
 
-        if args.dry:
-            print("=" * 79)
-            print(prompt)
-            print()
-            answer = ""
-        else:
-            answer = call_openai(prompt, args.model)
-            print(f"{item['id']} → {answer[:80]}…")
+            if args.dry:
+                if total_processed_dilemmas > 0 or processed_in_file > 0:
+                    print("\n" + "=" * 79)  # Separator for multiple dilemmas/files
+                else:
+                    print("=" * 79)
+                print(prompt)
+                print()
+                answer = ""
+            else:
+                answer = call_openai(prompt, args.model)
+                print(f"{item['id']} → {answer[:80]}…")
 
-        out_rows.append(
-            {
-                "id": item["id"],
-                "model": args.model,
-                "timestamp": _dt.datetime.utcnow().isoformat() + "Z",
-                "prompt": prompt,
-                "answer": answer,
-            }
+            out_rows.append(
+                {
+                    "id": item["id"],
+                    "model": args.model,
+                    "timestamp": _dt.datetime.utcnow().isoformat() + "Z",
+                    "prompt": prompt,
+                    "answer": answer,
+                    "source_file": str(
+                        dilemmas_path.relative_to(ROOT)
+                    ),  # Add source file
+                }
+            )
+            processed_in_file += 1
+            total_processed_dilemmas += 1
+        print(
+            f"Processed {processed_in_file} dilemmas from {dilemmas_path.relative_to(ROOT)}."
         )
 
     if args.out:
@@ -107,17 +158,38 @@ def run(args: argparse.Namespace) -> None:
         with out_path.open("w", encoding="utf-8") as fh:
             for row in out_rows:
                 fh.write(json.dumps(row, ensure_ascii=False) + "\n")
-        print(f"Saved {len(out_rows)} results → {out_path}")
+        print(
+            f"Saved {len(out_rows)} total results from {len(dilemma_files)} file(s) → {out_path}"
+        )
+    elif not args.dry:
+        print(
+            f"Processed {total_processed_dilemmas} dilemmas from {len(dilemma_files)} file(s). No --out path specified, results not saved."
+        )
+    else:  # Dry run, no output file
+        print(
+            f"Dry run complete. Processed {total_processed_dilemmas} dilemmas from {len(dilemma_files)} file(s)."
+        )
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run Dilma dilemmas through an LLM")
     parser.add_argument("--model", default="gpt-4o", help="Chat model to query")
     parser.add_argument(
-        "--dilemmas", required=True, help="Path to *.jsonl dilemma file"
+        "--dilemmas",
+        required=True,
+        help="Path to a *.jsonl dilemma file or a directory containing *.jsonl files.",
+    )
+    parser.add_argument(
+        "-r",
+        "--recursive",
+        action="store_true",
+        help="If --dilemmas is a directory, search recursively for *.jsonl files.",
     )
     parser.add_argument(
         "--dry", action="store_true", help="Print prompts only, no API call"
     )
-    parser.add_argument("--out", help="Optional output JSONL path for responses")
+    parser.add_argument(
+        "--out",
+        help="Optional output JSONL path for responses. All results will be combined into this single file.",
+    )
     run(parser.parse_args())
