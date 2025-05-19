@@ -73,7 +73,9 @@ def parse_runner_output(results_file: pathlib.Path, all_dilemmas: dict) -> list:
 
         writer = csv.writer(fh_csv)
         if not file_exists:
-            writer.writerow(["dilemma_id", "choice_id", "chosen_value_labels", "model_name"])
+            writer.writerow(
+                ["dilemma_id", "choice_id", "chosen_value_labels", "model_name"]
+            )
 
         for line in fh_results:
             if not line.strip():
@@ -126,10 +128,20 @@ def parse_runner_output(results_file: pathlib.Path, all_dilemmas: dict) -> list:
                     ["error_tag_not_found"],
                 )
                 writer.writerow(
-                    [dilemma_id, option_id, ",".join(tags) if tags else "no_tags", model_name]
+                    [
+                        dilemma_id,
+                        option_id,
+                        ",".join(tags) if tags else "no_tags",
+                        model_name,
+                    ]
                 )
                 parsed_results.append(
-                    {"id": dilemma_id, "choice": option_id, "tags": tags, "model": model_name}
+                    {
+                        "id": dilemma_id,
+                        "choice": option_id,
+                        "tags": tags,
+                        "model": model_name,
+                    }
                 )
             elif parsed_choice == "B":
                 option_id = "B"
@@ -142,15 +154,30 @@ def parse_runner_output(results_file: pathlib.Path, all_dilemmas: dict) -> list:
                     ["error_tag_not_found"],
                 )
                 writer.writerow(
-                    [dilemma_id, option_id, ",".join(tags) if tags else "no_tags", model_name]
+                    [
+                        dilemma_id,
+                        option_id,
+                        ",".join(tags) if tags else "no_tags",
+                        model_name,
+                    ]
                 )
                 parsed_results.append(
-                    {"id": dilemma_id, "choice": option_id, "tags": tags, "model": model_name}
+                    {
+                        "id": dilemma_id,
+                        "choice": option_id,
+                        "tags": tags,
+                        "model": model_name,
+                    }
                 )
             elif parsed_choice == "INVALID":
                 writer.writerow([dilemma_id, "INVALID", "invalid", model_name])
                 parsed_results.append(
-                    {"id": dilemma_id, "choice": "INVALID", "tags": ["invalid"], "model": model_name}
+                    {
+                        "id": dilemma_id,
+                        "choice": "INVALID",
+                        "tags": ["invalid"],
+                        "model": model_name,
+                    }
                 )
             else:
                 # Handle cases where the answer is not clearly A, B, or INVALID
@@ -159,7 +186,12 @@ def parse_runner_output(results_file: pathlib.Path, all_dilemmas: dict) -> list:
                 )
                 writer.writerow([dilemma_id, "UNPARSEABLE", "unparseable", model_name])
                 parsed_results.append(
-                    {"id": dilemma_id, "choice": "UNPARSEABLE", "tags": ["unparseable"], "model": model_name}
+                    {
+                        "id": dilemma_id,
+                        "choice": "UNPARSEABLE",
+                        "tags": ["unparseable"],
+                        "model": model_name,
+                    }
                 )
 
     print(f"📊 Value label distribution saved to {output_csv_path}")

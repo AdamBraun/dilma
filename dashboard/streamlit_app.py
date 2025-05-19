@@ -96,11 +96,11 @@ if "model_name" in run_df.columns:
 
 # Add "All" option only if there are models, otherwise selectbox is empty or shows first model.
 # Default to first model if available, or "All" if multiple, or handle empty run_df gracefully.
-if not model_names: # No run data or model_name column missing
+if not model_names:  # No run data or model_name column missing
     sel_model = None
     st.sidebar.info("No model data found in results CSV to filter by.")
 elif len(model_names) == 1:
-    sel_model = model_names[0] # Auto-select if only one model
+    sel_model = model_names[0]  # Auto-select if only one model
     st.sidebar.markdown(f"**Model:** {sel_model} (only one available)")
 else:
     sel_model = st.sidebar.selectbox("Filter by model", ["All"] + model_names)
@@ -112,7 +112,12 @@ if sel_tractate != "All":
         run_df = run_df[run_df["dilemma_id"].isin(dl_df["id"])]
 
 # Apply model filter (if a model is selected and run_df is not empty)
-if sel_model and sel_model != "All" and not run_df.empty and "model_name" in run_df.columns:
+if (
+    sel_model
+    and sel_model != "All"
+    and not run_df.empty
+    and "model_name" in run_df.columns
+):
     run_df = run_df[run_df["model_name"] == sel_model]
 
 # -----------------------------------------------------------------------------
@@ -165,9 +170,41 @@ if ax_df["left_count"].abs().sum() + ax_df["right_count"].sum() == 0:
 else:
     fig, ax = plt.subplots(figsize=(5, 3))
     # Plot right (positive) bars
-    ax.barh(ax_df.index, ax_df["right_count"], color="#4c72b0", label="Other-leaning")
+    right_bars = ax.barh(
+        ax_df.index, ax_df["right_count"], color="#4c72b0", label="Other-leaning"
+    )
     # Plot left (negative) bars
-    ax.barh(ax_df.index, ax_df["left_count"], color="#dd8452", label="Self-leaning")
+    left_bars = ax.barh(
+        ax_df.index, ax_df["left_count"], color="#dd8452", label="Self-leaning"
+    )
+
+    # Add labels to bars
+    for bar in right_bars:
+        width = bar.get_width()
+        if width > 0:  # Only label non-zero bars
+            ax.text(
+                width / 2,
+                bar.get_y() + bar.get_height() / 2.0,
+                f"{width}",
+                ha="center",
+                va="center",
+                fontsize=8,
+                color="white",
+            )
+
+    for bar in left_bars:
+        width = bar.get_width()
+        if width < 0:  # Only label non-zero bars (width is negative here)
+            ax.text(
+                width / 2,
+                bar.get_y() + bar.get_height() / 2.0,
+                f"{abs(width)}",
+                ha="center",
+                va="center",
+                fontsize=8,
+                color="white",
+            )
+
     # Center line
     ax.axvline(0, color="black", linewidth=0.6)
     ax.set_xlabel("Count of answers")
