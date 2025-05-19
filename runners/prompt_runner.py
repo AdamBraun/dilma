@@ -79,7 +79,7 @@ def build_prompt(item: Dict[str, Any]) -> str:
     )
 
 
-def call_openai(prompt: str, model: str) -> str:
+def call_openai(prompt: str, model: str, temperature: float) -> str:
     if client is None:
         raise RuntimeError(
             "openai package missing. Install with `pip install openai` or use --dry."
@@ -87,7 +87,7 @@ def call_openai(prompt: str, model: str) -> str:
     rsp = client.chat.completions.create(
         model=model,
         messages=[{"role": "user", "content": prompt}],
-        temperature=0,
+        temperature=temperature,
     )
     return rsp.choices[0].message.content.strip()
 
@@ -150,7 +150,7 @@ def run(args: argparse.Namespace) -> None:
                 print()
                 answer = ""
             else:
-                answer = call_openai(prompt, args.model)
+                answer = call_openai(prompt, args.model, args.temperature)
                 print(f"{item['id']} → {answer[:80]}…")
 
             out_rows.append(
@@ -223,5 +223,11 @@ if __name__ == "__main__":
              "'prime': only 'prime'. "
              "'okay': 'prime' or 'okay'. "
              "'weak': 'prime', 'okay', 'weak', or unspecified (default).",
+    )
+    parser.add_argument(
+        "--temperature",
+        type=float,
+        default=0.0,
+        help="Sampling temperature for the model (e.g., 0.0 for deterministic, 0.7 for creative). Default: 0.0",
     )
     run(parser.parse_args())
