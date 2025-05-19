@@ -48,7 +48,7 @@ def load_dilemmas() -> pd.DataFrame:
     rows: List[Dict] = []
     for jf in DILEMMA_DIR.rglob("*.jsonl"):
         order_name = jf.parent.name  # e.g., 'nezikin'
-        tract = jf.stem              # e.g., 'bava_metzia'
+        tract = jf.stem  # e.g., 'bava_metzia'
         for obj in read_jsonl(jf):
             rows.append(
                 {
@@ -59,6 +59,8 @@ def load_dilemmas() -> pd.DataFrame:
                     "vignette": obj["vignette"],
                     "option_A_tags": "|".join(obj["options"][0]["tags"]),
                     "option_B_tags": "|".join(obj["options"][1]["tags"]),
+                    "option_A_text": obj["options"][0]["text"],
+                    "option_B_text": obj["options"][1]["text"],
                 }
             )
     return pd.DataFrame(rows)
@@ -226,67 +228,116 @@ else:
                 # Or it's the full dl_df if sel_tractate == "All"
                 for _idx, row in dl_df.iterrows():
                     d_id = row["id"]
-                    option_a_tags_list = row["option_A_tags"].split('|') if pd.notna(row["option_A_tags"]) and row["option_A_tags"] else []
-                    option_b_tags_list = row["option_B_tags"].split('|') if pd.notna(row["option_B_tags"]) and row["option_B_tags"] else []
+                    option_a_tags_list = (
+                        row["option_A_tags"].split("|")
+                        if pd.notna(row["option_A_tags"]) and row["option_A_tags"]
+                        else []
+                    )
+                    option_b_tags_list = (
+                        row["option_B_tags"].split("|")
+                        if pd.notna(row["option_B_tags"]) and row["option_B_tags"]
+                        else []
+                    )
                     letter_to_tags[d_id] = {
-                        'A': option_a_tags_list,
-                        'B': option_b_tags_list
+                        "A": option_a_tags_list,
+                        "B": option_b_tags_list,
                     }
 
                 # Define poles for tag classification in this context
                 poles_for_dilemma_diff = {
-                    "self": ["self-preservation", "property-rights", "reciprocity", "privacy"],
+                    "self": [
+                        "self-preservation",
+                        "property-rights",
+                        "reciprocity",
+                        "privacy",
+                    ],
                     "other": ["altruism", "responsibility", "worker-dignity"],
                 }
 
                 # build a comparison dataframe per dilemma using comp_df
                 # comp_df is already filtered for model_a and model_b and by tractate
                 if not comp_df.empty:
-                    pivot_q = comp_df.pivot(index="dilemma_id", columns="model_name", values="choice_id")
-                    
+                    pivot_q = comp_df.pivot(
+                        index="dilemma_id", columns="model_name", values="choice_id"
+                    )
+
                     # Ensure both selected models are columns in pivot_q before proceeding
                     if model_a in pivot_q.columns and model_b in pivot_q.columns:
                         # keep rows with a difference
                         diff_q = pivot_q[pivot_q[model_a] != pivot_q[model_b]].copy()
 
                         if not diff_q.empty:
+
                             def get_pole_for_choice(choice_letter, dilemma_id):
-                                tags_for_choice = letter_to_tags.get(dilemma_id, {}).get(choice_letter, [])
-                                if any(t in poles_for_dilemma_diff["self"] for t in tags_for_choice):
+                                tags_for_choice = letter_to_tags.get(
+                                    dilemma_id, {}
+                                ).get(choice_letter, [])
+                                if any(
+                                    t in poles_for_dilemma_diff["self"]
+                                    for t in tags_for_choice
+                                ):
                                     return "self"
-                                if any(t in poles_for_dilemma_diff["other"] for t in tags_for_choice):
+                                if any(
+                                    t in poles_for_dilemma_diff["other"]
+                                    for t in tags_for_choice
+                                ):
                                     return "other"
-                                if choice_letter == "INVALID": # Explicitly from choice_id
-                                     return "invalid"
-                                return "n/a" # No matching pole or not A/B/INVALID
+                                if (
+                                    choice_letter == "INVALID"
+                                ):  # Explicitly from choice_id
+                                    return "invalid"
+                                return "n/a"  # No matching pole or not A/B/INVALID
 
                             diff_q["Δ_pole_viz"] = [
                                 f"{get_pole_for_choice(b_choice, did)} ← {get_pole_for_choice(a_choice, did)}"
-                                for did, (a_choice, b_choice) in diff_q[[model_a, model_b]].iterrows()
+                                for did, (a_choice, b_choice) in diff_q[
+                                    [model_a, model_b]
+                                ].iterrows()
                             ]
 
                             # merge titles for readability (dl_df is already appropriately filtered by tractate)
-                            diff_q = diff_q.merge(dl_df[["id", "title"]], left_index=True, right_on="id", how="left")
-                            
+                            diff_q = diff_q.merge(
+                                dl_df[["id", "title"]],
+                                left_index=True,
+                                right_on="id",
+                                how="left",
+                            )
+
                             # Select and rename columns for display
-                            display_columns = ["id", "title", model_a, model_b, "Δ_pole_viz"]
+                            display_columns = [
+                                "id",
+                                "title",
+                                model_a,
+                                model_b,
+                                "Δ_pole_viz",
+                            ]
                             # Filter out rows where title might be NaN if merge failed for some IDs
-                            diff_q_display = diff_q[display_columns].dropna(subset=["title"])
+                            diff_q_display = diff_q[display_columns].dropna(
+                                subset=["title"]
+                            )
 
                             st.dataframe(
-                                diff_q_display.rename(columns={
-                                    model_a: f"Choice ({model_a})", 
-                                    model_b: f"Choice ({model_b})",
-                                    "Δ_pole_viz": "Δ Pole (B ← A)"
-                                }),
+                                diff_q_display.rename(
+                                    columns={
+                                        model_a: f"Choice ({model_a})",
+                                        model_b: f"Choice ({model_b})",
+                                        "Δ_pole_viz": "Δ Pole (B ← A)",
+                                    }
+                                ),
                                 use_container_width=True,
                             )
                         else:
-                            st.write("Models made identical choices for all dilemmas in this set (or no common dilemmas with choices). ")
+                            st.write(
+                                "Models made identical choices for all dilemmas in this set (or no common dilemmas with choices). "
+                            )
                     else:
-                        st.write(f"One or both selected models ({model_a}, {model_b}) have no data for the current selection.")
+                        st.write(
+                            f"One or both selected models ({model_a}, {model_b}) have no data for the current selection."
+                        )
                 else:
-                     st.write("No data available for dilemma-level comparison with current model selections.")
+                    st.write(
+                        "No data available for dilemma-level comparison with current model selections."
+                    )
                 # --- DILEMMA-LEVEL DIFF TABLE END ---
             else:
                 st.info(
@@ -433,5 +484,5 @@ else:
 # -----------------------------------------------------------------------------
 
 st.subheader("Dilemmas")
-show_cols = ["id", "title", "vignette"]
+show_cols = ["id", "title", "vignette", "option_A_text", "option_B_text"]
 st.dataframe(dl_df[show_cols], use_container_width=True)
