@@ -165,8 +165,10 @@ for axis, (left_tag, right_tag) in axes.items():
 
 ax_df = pd.DataFrame(rows).set_index("axis")
 
-if ax_df["left_count"].abs().sum() + ax_df["right_count"].sum() == 0:
-    st.info("No run data yet for diverging bar.")
+invalids_total = tag_counter.get("invalid", 0)
+
+if ax_df["left_count"].abs().sum() + ax_df["right_count"].sum() == 0 and invalids_total == 0:
+    st.info("No run data yet for bipolar axes chart.")
 else:
     fig, ax = plt.subplots(figsize=(5, 3))
     # Plot right (positive) bars
@@ -178,7 +180,14 @@ else:
         ax_df.index, ax_df["left_count"], color="#dd8452", label="Self-leaning"
     )
 
-    # Add labels to bars
+    # Add "Invalid" bars, starting from the left edge of the "Self-leaning" segment
+    if invalids_total > 0:
+        # Plot invalid bars one by one to handle the legend label correctly for the series
+        for i, axis_name in enumerate(ax_df.index):
+            current_left_edge = ax_df.loc[axis_name, "left_count"]
+            ax.barh(axis_name, invalids_total, left=current_left_edge, color="#999999", label="Invalid" if i == 0 else "")
+
+    # Add labels to right_bars
     for bar in right_bars:
         width = bar.get_width()
         if width > 0:  # Only label non-zero bars
@@ -192,6 +201,7 @@ else:
                 color="white",
             )
 
+    # Add labels to left_bars
     for bar in left_bars:
         width = bar.get_width()
         if width < 0:  # Only label non-zero bars (width is negative here)
@@ -203,6 +213,25 @@ else:
                 va="center",
                 fontsize=8,
                 color="white",
+            )
+    
+    # Add labels to invalid_bars (if they were plotted)
+    if invalids_total > 0:
+        # Re-iterate or access plotted invalid bars to add text
+        # For simplicity, let's recalculate positions based on ax_df as we did for plotting
+        for i, axis_name in enumerate(ax_df.index):
+            current_left_edge = ax_df.loc[axis_name, "left_count"]
+            # y_position needs to match the bar's y position. 
+            # We can get it from the left_bars collection assuming the same order and y-coordinates.
+            y_pos = left_bars[i].get_y() + left_bars[i].get_height() / 2.0
+            ax.text(
+                current_left_edge + invalids_total / 2.0, # Center of the invalid bar segment
+                y_pos,
+                f"{invalids_total}",
+                ha="center",
+                va="center",
+                fontsize=8,
+                color="white", # Assuming white text is okay on #999999 grey
             )
 
     # Center line
