@@ -105,8 +105,9 @@ dl_df = dl_df_full.copy()
 run_df = run_df_original.copy()
 
 # -----------------------------------------------------------------------------
-# Global top-bar filters
+# Global top-bar filters (Tractate & Model)
 # -----------------------------------------------------------------------------
+# Build tractate options
 if not dl_df_full.empty and "tractate" in dl_df_full.columns:
     tractates = sorted(dl_df_full["tractate"].unique())
 else:
@@ -117,16 +118,47 @@ current_tract = st.session_state.get("sel_tractate", "All")
 if current_tract not in ["All"] + tractates:
     current_tract = "All"
 
-sel_tractate = st.selectbox(
-    "Tractate",
-    ["All"] + tractates,
-    index=(["All"] + tractates).index(current_tract),
-    key="tractate_filter_top",
-    help="Filter all charts by tractate",
-)
+# Layout two columns so filters share the same line
+col1, col2 = st.columns(2)
 
-# Persist selection for other pages
+with col1:
+    sel_tractate = st.selectbox(
+        "Tractate",
+        ["All"] + tractates,
+        index=(["All"] + tractates).index(current_tract),
+        key="tractate_filter_top",
+        help="Filter all charts by tractate",
+    )
+
+# --- Compute model list based on selected tractate ---
+run_df_for_model_opts = run_df_original.copy()
+if sel_tractate != "All" and not run_df_for_model_opts.empty:
+    # Need list of dilemma ids for tractate to filter run_df
+    d_ids_for_tractate = dl_df_full[dl_df_full["tractate"] == sel_tractate]["id"]
+    run_df_for_model_opts = run_df_for_model_opts[
+        run_df_for_model_opts["dilemma_id"].isin(d_ids_for_tractate)
+    ]
+
+model_opts = []
+if not run_df_for_model_opts.empty and "model_name" in run_df_for_model_opts.columns:
+    model_opts = sorted(run_df_for_model_opts["model_name"].unique())
+
+current_model = st.session_state.get("sel_model", "All")
+if current_model not in ["All"] + model_opts:
+    current_model = "All"
+
+with col2:
+    sel_model = st.selectbox(
+        "Model",
+        ["All"] + model_opts,
+        index=(["All"] + model_opts).index(current_model),
+        key="model_filter_top",
+        help="Filter all charts by model (main display)",
+    )
+
+# Persist selections across pages
 st.session_state.sel_tractate = sel_tractate
+st.session_state.sel_model = sel_model
 
 # Apply tractate filter to dl_df and run_df for this page
 if sel_tractate != "All":
@@ -134,38 +166,9 @@ if sel_tractate != "All":
     if not run_df.empty:
         run_df = run_df[run_df["dilemma_id"].isin(dl_df["id"])]
 
-# -----------------------------------------------------------------------------
-# Sidebar filters - Stage 2 (Main Model Filter)
-# -----------------------------------------------------------------------------
-st.sidebar.markdown("---")
-st.sidebar.subheader("Main Display Filter")
-
-# Populate model names from the potentially tractate-filtered run_df
-model_names_for_main_display = []
-if not run_df.empty and "model_name" in run_df.columns:
-    model_names_for_main_display = sorted(run_df["model_name"].unique())
-
-if not model_names_for_main_display:
-    sel_model = None
-    st.sidebar.info("No model data for the current tractate to filter by.")
-elif len(model_names_for_main_display) == 1:
-    sel_model = model_names_for_main_display[0]
-    st.sidebar.markdown(f"**Model:** {sel_model} (only one available)")
-else:
-    sel_model = st.sidebar.selectbox(
-        "Filter by model",
-        ["All"] + model_names_for_main_display,
-        key="sel_model_main",
-    )
-
-# Store selected model in session state for other pages
-if sel_model and sel_model != "All":
-    st.session_state.sel_model = sel_model
-
-# Apply model filter to run_df (which is already tractate-filtered)
+# Apply model filter to run_df (after tractate filter applied)
 if (
-    sel_model
-    and sel_model != "All"
+    sel_model != "All"
     and not run_df.empty
     and "model_name" in run_df.columns
 ):
