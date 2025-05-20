@@ -7,7 +7,7 @@ Launch with:
 Displays
 ---------
 1. **Stacked bar** — total count per value‑label chosen by the model.
-2. **Radar (“skill”) chart** — same counts plotted as a profile.
+2. **Radar ("skill") chart** — same counts plotted as a profile.
 3. Raw dilemma table.
 
 Data sources
@@ -87,7 +87,7 @@ def load_run() -> pd.DataFrame:
 # Global Definitions & Initial Data Load
 # -----------------------------------------------------------------------------
 
-# Define the poles for each axis (used by model comparison and Chart 2)
+# Define the poles for each axis (used by Chart 2 on this page)
 axes = {
     "Survival / Welfare": ("self-preservation", "altruism"),
     "Entitlement / Obligation": ("property-rights", "responsibility"),
@@ -97,348 +97,76 @@ axes = {
     "Transcendent Norm / Pragmatism": ("religious-duty", "proportionality"),
 }
 
-dl_df = load_dilemmas()
+dl_df_full = load_dilemmas()  # Load all dilemmas, keep a full copy
 run_df_original = load_run()  # Keep original for full model lists
-run_df = run_df_original.copy()  # This copy will be filtered for main display
+
+# Make copies for filtering on this page
+dl_df = dl_df_full.copy()
+run_df = run_df_original.copy()
 
 # -----------------------------------------------------------------------------
-# Sidebar filters - Stage 1 (Tractate Filter)
+# Global top-bar filters
 # -----------------------------------------------------------------------------
-tractates = sorted(dl_df["tractate"].unique())
-sel_tractate = st.sidebar.selectbox("Filter by tractate", ["All"] + tractates)
+if not dl_df_full.empty and "tractate" in dl_df_full.columns:
+    tractates = sorted(dl_df_full["tractate"].unique())
+else:
+    tractates = []
+    st.warning("No tractate data found. Dilemma files may be missing in 'data/dilemmas/'.")
 
-# Apply tractate filter to dl_df and the main run_df
+current_tract = st.session_state.get("sel_tractate", "All")
+if current_tract not in ["All"] + tractates:
+    current_tract = "All"
+
+sel_tractate = st.selectbox(
+    "Tractate",
+    ["All"] + tractates,
+    index=(["All"] + tractates).index(current_tract),
+    key="tractate_filter_top",
+    help="Filter all charts by tractate",
+)
+
+# Persist selection for other pages
+st.session_state.sel_tractate = sel_tractate
+
+# Apply tractate filter to dl_df and run_df for this page
 if sel_tractate != "All":
     dl_df = dl_df[dl_df["tractate"] == sel_tractate]
-    if not run_df.empty:  # Check before filtering
+    if not run_df.empty:
         run_df = run_df[run_df["dilemma_id"].isin(dl_df["id"])]
 
 # -----------------------------------------------------------------------------
-# Model-vs-Model comparison
+# Sidebar filters - Stage 2 (Main Model Filter)
 # -----------------------------------------------------------------------------
-st.sidebar.markdown("---")  # Visual separator in sidebar
-st.sidebar.subheader("Model Comparison")
-
-# Use run_df_original for populating model choices to ensure all models are available
-model_ids_for_comparison = []
-if not run_df_original.empty and "model_name" in run_df_original.columns:
-    model_ids_for_comparison = sorted(run_df_original["model_name"].unique())
-
-if (
-    not model_ids_for_comparison or len(model_ids_for_comparison) < 1
-):  # Need at least one model to select
-    st.sidebar.info("Not enough model data in results CSV for comparison.")
-else:
-    col1, col2 = st.sidebar.columns(2)
-    with col1:
-        model_a = st.selectbox(
-            "Model A", model_ids_for_comparison, index=0, key="model_a_select"
-        )
-    with col2:
-        # Ensure index for model_b is valid, especially if only one model exists
-        model_b_index = min(1, len(model_ids_for_comparison) - 1)
-        if (
-            len(model_ids_for_comparison) == 1
-        ):  # If only one model, default to same as model_a
-            model_b_index = 0
-        model_b = st.selectbox(
-            "Model B",
-            model_ids_for_comparison,
-            index=model_b_index,
-            key="model_b_select",
-        )
-
-    # run_df here is already filtered by tractate from the main filter
-    # comp_df will be based on this tractate-filtered run_df, further filtered by model_a and model_b
-    comp_df_source = run_df  # Use the (potentially) tractate-filtered run_df
-
-    if not comp_df_source.empty and model_a != model_b:
-        comp_df = comp_df_source[comp_df_source["model_name"].isin([model_a, model_b])]
-
-        data = []
-        for axis, (left_tag, right_tag) in axes.items():
-            for mid_model_name in (model_a, model_b):
-                subset = comp_df[comp_df["model_name"] == mid_model_name]
-
-                current_axis_self_n = (
-                    subset["chosen_value_labels"].apply(lambda x: left_tag in x).sum()
-                )
-                current_axis_other_n = (
-                    subset["chosen_value_labels"].apply(lambda x: right_tag in x).sum()
-                )
-                # Total invalid responses for this model (not strictly per axis, but per model for this comparison)
-                model_total_invalid_n = (subset["choice_id"] == "INVALID").sum()
-
-                data.append(
-                    {
-                        "axis": axis,
-                        "model_name": mid_model_name,  # Changed from "model" to "model_name"
-                        "self": current_axis_self_n,
-                        "other": current_axis_other_n,
-                        "invalid": model_total_invalid_n,
-                    }
-                )
-
-        if data:  # Ensure data was actually populated
-            pivot = (
-                pd.DataFrame(data).set_index(["axis", "model_name"]).unstack()
-            )  # Changed from "model"
-            if (
-                not pivot.empty
-                and model_b in pivot.columns.levels[1]
-                and model_a in pivot.columns.levels[1]
-            ):  # Check if models are in pivot
-                diff = pivot.xs(model_b, level="model_name", axis=1) - pivot.xs(
-                    model_a, level="model_name", axis=1
-                )
-                diff.columns = pd.MultiIndex.from_product([["Δ"], diff.columns])
-
-                # Determine which axes actually have a non-zero difference to populate the dropdown
-                axes_with_diff = [
-                    ax for ax in diff.index if diff.loc[ax].abs().sum() > 0
-                ]
-
-                table = pd.concat([pivot, diff], axis=1).sort_index(
-                    axis=1
-                )  # Sort columns for consistent display
-                st.subheader(f"Model diff: {model_b} – {model_a}")
-                st.dataframe(table.style.format(precision=0), use_container_width=True)
-
-                # Optional bar chart of Δ other vs Δ self
-                fig_comp, ax_comp = plt.subplots(figsize=(5, 3))
-                ax_comp.barh(
-                    diff.index,
-                    diff[("Δ", "other")],
-                    color="#4c72b0",
-                    label="Other-leaning Δ",
-                )
-                ax_comp.barh(
-                    diff.index,
-                    -diff[("Δ", "self")],
-                    color="#dd8452",
-                    label="Self-leaning Δ",
-                )
-                ax_comp.axvline(0, color="k", linewidth=0.6)
-                ax_comp.set_xlabel("Δ count (B – A)")
-                ax_comp.legend()
-                st.pyplot(fig_comp)
-
-                # --- DILEMMA-LEVEL DIFF TABLE START ---
-                st.markdown("### Per-dilemma choice differences")
-
-                # Axis filter UI for dilemma-level diff (only axes that have diff)
-                axis_filter_options = ["All"] + axes_with_diff
-                sel_axis_filter = st.selectbox(
-                    "Filter by Bipolar Axis (for dilemma list):",
-                    axis_filter_options,
-                    key="dilemma_diff_axis_filter",
-                )
-
-                # Helper to map dilemma options to tags
-                letter_to_tags = {}
-                # Use the globally available dl_df which is already tractate-filtered if sel_tractate != "All"
-                # Or it's the full dl_df if sel_tractate == "All"
-                for _idx, row in dl_df.iterrows():
-                    d_id = row["id"]
-                    option_a_tags_list = (
-                        row["option_A_tags"].split("|")
-                        if pd.notna(row["option_A_tags"]) and row["option_A_tags"]
-                        else []
-                    )
-                    option_b_tags_list = (
-                        row["option_B_tags"].split("|")
-                        if pd.notna(row["option_B_tags"]) and row["option_B_tags"]
-                        else []
-                    )
-                    letter_to_tags[d_id] = {
-                        "A": option_a_tags_list,
-                        "B": option_b_tags_list,
-                    }
-
-                # Define poles for tag classification in this context
-                poles_for_dilemma_diff = {
-                    "self": [
-                        "self-preservation",
-                        "property-rights",
-                        "reciprocity",
-                        "privacy",
-                    ],
-                    "other": ["altruism", "responsibility", "worker-dignity"],
-                }
-
-                # build a comparison dataframe per dilemma using comp_df
-                # comp_df is already filtered for model_a and model_b and by tractate
-                if not comp_df.empty:
-                    pivot_q = comp_df.pivot(
-                        index="dilemma_id", columns="model_name", values="choice_id"
-                    )
-
-                    # Ensure both selected models are columns in pivot_q before proceeding
-                    if model_a in pivot_q.columns and model_b in pivot_q.columns:
-                        # keep rows with a difference
-                        diff_q = pivot_q[pivot_q[model_a] != pivot_q[model_b]].copy()
-
-                        if not diff_q.empty:
-
-                            def get_pole_for_choice(choice_letter, dilemma_id):
-                                tags_for_choice = letter_to_tags.get(
-                                    dilemma_id, {}
-                                ).get(choice_letter, [])
-                                if any(
-                                    t in poles_for_dilemma_diff["self"]
-                                    for t in tags_for_choice
-                                ):
-                                    return "self"
-                                if any(
-                                    t in poles_for_dilemma_diff["other"]
-                                    for t in tags_for_choice
-                                ):
-                                    return "other"
-                                if (
-                                    choice_letter == "INVALID"
-                                ):  # Explicitly from choice_id
-                                    return "invalid"
-                                return "n/a"  # No matching pole or not A/B/INVALID
-
-                            diff_q["Δ_pole_viz"] = [
-                                f"{get_pole_for_choice(b_choice, did)} ← {get_pole_for_choice(a_choice, did)}"
-                                for did, (a_choice, b_choice) in diff_q[
-                                    [model_a, model_b]
-                                ].iterrows()
-                            ]
-
-                            # merge titles for readability (dl_df is already appropriately filtered by tractate)
-                            diff_q = diff_q.merge(
-                                dl_df[
-                                    ["id", "title", "option_A_tags", "option_B_tags"]
-                                ],  # Ensure tags are merged
-                                left_index=True,
-                                right_on="id",
-                                how="left",
-                            )
-
-                            # Apply Axis Filter to diff_q
-                            if sel_axis_filter != "All":
-                                axis_left_tag, axis_right_tag = axes[sel_axis_filter]
-
-                                def check_dilemma_axis_tags(
-                                    row, left_tag_to_check, right_tag_to_check
-                                ):
-                                    tags_a_list = (
-                                        row["option_A_tags"].split("|")
-                                        if pd.notna(row["option_A_tags"])
-                                        else []
-                                    )
-                                    tags_b_list = (
-                                        row["option_B_tags"].split("|")
-                                        if pd.notna(row["option_B_tags"])
-                                        else []
-                                    )
-                                    return (
-                                        (left_tag_to_check in tags_a_list)
-                                        or (right_tag_to_check in tags_a_list)
-                                        or (left_tag_to_check in tags_b_list)
-                                        or (right_tag_to_check in tags_b_list)
-                                    )
-
-                                diff_q = diff_q[
-                                    diff_q.apply(
-                                        check_dilemma_axis_tags,
-                                        args=(axis_left_tag, axis_right_tag),
-                                        axis=1,
-                                    )
-                                ]
-
-                            if not diff_q.empty:
-                                # Select and rename columns for display
-                                display_columns = [
-                                    "id",
-                                    "title",
-                                    model_a,
-                                    model_b,
-                                    "Δ_pole_viz",
-                                ]
-                                # Filter out rows where title might be NaN if merge failed for some IDs
-                                diff_q_display = diff_q[display_columns].dropna(
-                                    subset=["title"]
-                                )
-
-                                st.dataframe(
-                                    diff_q_display.rename(
-                                        columns={
-                                            model_a: f"Choice ({model_a})",
-                                            model_b: f"Choice ({model_b})",
-                                            "Δ_pole_viz": "Δ Pole (B ← A)",
-                                        }
-                                    ),
-                                    use_container_width=True,
-                                )
-                            else:
-                                st.write(
-                                    "Models made identical choices for all dilemmas in this set (or no common dilemmas with choices)."
-                                )
-                        else:
-                            st.write(
-                                "No data available for dilemma-level comparison with current model selections."
-                            )
-                    else:
-                        st.write(
-                            f"One or both selected models ({model_a}, {model_b}) have no data for the current selection."
-                        )
-                else:
-                    st.write(
-                        "No data available for dilemma-level comparison with current model selections."
-                    )
-                # --- DILEMMA-LEVEL DIFF TABLE END ---
-            else:
-                st.info(
-                    f"No comparable data found for {model_a} and {model_b} with current filters."
-                )
-
-    elif model_a == model_b:
-        st.info("Select two different models to see differences.")
-    # Removed the 'else' for comp_df_source.empty as it's covered by not model_ids_for_comparison
-
-st.sidebar.markdown("---")  # Visual separator
+st.sidebar.markdown("---")
 st.sidebar.subheader("Main Display Filter")
 
-# -----------------------------------------------------------------------------
-# Sidebar filters - Stage 2 (Main Model Filter for subsequent charts)
-# -----------------------------------------------------------------------------
-# model_names = [] # This was the old way
-# if "model_name" in run_df.columns: # This run_df is tractate-filtered
-# model_names = sorted(run_df["model_name"].unique())
-
-# Use model_ids_for_comparison for consistency in available models, or derive from current run_df
-# If run_df is empty due to tractate filter, model_names will be empty
+# Populate model names from the potentially tractate-filtered run_df
+model_names_for_main_display = []
 if not run_df.empty and "model_name" in run_df.columns:
     model_names_for_main_display = sorted(run_df["model_name"].unique())
-else:
-    model_names_for_main_display = []
-
 
 if not model_names_for_main_display:
     sel_model = None
-    st.sidebar.info(
-        "No model data for the current tractate to filter by for main display."
-    )
+    st.sidebar.info("No model data for the current tractate to filter by.")
 elif len(model_names_for_main_display) == 1:
     sel_model = model_names_for_main_display[0]
-    st.sidebar.markdown(
-        f"**Model:** {sel_model} (only one available for this tractate)"
-    )
+    st.sidebar.markdown(f"**Model:** {sel_model} (only one available)")
 else:
     sel_model = st.sidebar.selectbox(
-        "Filter by model (main display)",
+        "Filter by model",
         ["All"] + model_names_for_main_display,
         key="sel_model_main",
     )
 
-# Apply main model filter to run_df (which is already tractate-filtered)
+# Store selected model in session state for other pages
+if sel_model and sel_model != "All":
+    st.session_state.sel_model = sel_model
+
+# Apply model filter to run_df (which is already tractate-filtered)
 if (
     sel_model
     and sel_model != "All"
-    and not run_df.empty  # ensure run_df is not empty before trying to filter
+    and not run_df.empty
     and "model_name" in run_df.columns
 ):
     run_df = run_df[run_df["model_name"] == sel_model]
@@ -446,9 +174,9 @@ if (
 # -----------------------------------------------------------------------------
 # Chart 1 — stacked bar of value tags chosen
 # -----------------------------------------------------------------------------
-
 st.subheader("Value‑label distribution of model choices")
 
+# tag_counter uses the page-specific filtered run_df
 tag_counter = Counter(t for lst in run_df["chosen_value_labels"] for t in lst)
 if tag_counter:
     tag_df = (
@@ -458,14 +186,16 @@ if tag_counter:
     )
     st.bar_chart(tag_df)
 else:
-    st.info("No parsed run data yet. Run the model first.")
+    st.info(
+        "No parsed run data yet for the current selection. Run the model or adjust filters."
+    )
 
 # -----------------------------------------------------------------------------
 # Chart 2 — Diverging stacked bar for the three bipolar axes
 # -----------------------------------------------------------------------------
-
 st.subheader("Bipolar axes: self ←  → other")
 
+# This chart also uses the page-specific filtered run_df
 rows = []
 for axis, (left_tag, right_tag) in axes.items():
     left_cnt = run_df["chosen_value_labels"].apply(lambda x: left_tag in x).sum()
@@ -478,30 +208,24 @@ for axis, (left_tag, right_tag) in axes.items():
     rows.append(
         {
             "axis": axis,
-            "left": -left_cnt,  # negative = self-leaning
-            "right": right_cnt,  # positive = other-leaning
+            "left": -left_cnt,
+            "right": right_cnt,
             "invalid": invalid_cnt,
-        }  # keep positive, plot to the right of 'right'
+        }
     )
 
 ax_df = pd.DataFrame(rows).set_index("axis")
 
 if not ax_df[["left", "right", "invalid"]].abs().values.sum():
-    st.info("No run data yet for bipolar axes chart.")
+    st.info("No run data yet for bipolar axes chart for the current selection.")
 else:
     fig, ax = plt.subplots(figsize=(5, 3))
-
-    # plot self-leaning
     left_bars = ax.barh(
         ax_df.index, ax_df["left"], color="#dd8452", label="Self-leaning"
     )
-
-    # plot other-leaning
     right_bars = ax.barh(
         ax_df.index, ax_df["right"], color="#4c72b0", label="Other-leaning"
     )
-
-    # plot invalid, immediately to the right of the other-leaning segment
     invalid_bars = ax.barh(
         ax_df.index,
         ax_df["invalid"],
@@ -509,10 +233,8 @@ else:
         color="#999999",
         label="Invalid",
     )
-
-    # numeric labels
-    for bars in (left_bars, right_bars, invalid_bars):
-        for bar in bars:
+    for bars_collection in (left_bars, right_bars, invalid_bars):
+        for bar in bars_collection:
             w = bar.get_width()
             if w != 0:
                 ax.text(
@@ -524,7 +246,6 @@ else:
                     fontsize=8,
                     color="white",
                 )
-
     ax.axvline(0, color="black", linewidth=0.6)
     ax.set_xlabel("Count of answers")
     ax.legend(loc="upper right")
@@ -533,7 +254,7 @@ else:
 # -----------------------------------------------------------------------------
 # Table of dilemmas
 # -----------------------------------------------------------------------------
-
 st.subheader("Dilemmas")
+# This table uses the page-specific filtered dl_df
 show_cols = ["id", "title", "vignette", "option_A_text", "option_B_text"]
-st.dataframe(dl_df[show_cols], use_container_width=True)
+st.dataframe(dl_df[show_cols], use_container_width=True) 
