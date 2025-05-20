@@ -121,7 +121,11 @@ def run(args: argparse.Namespace) -> None:
     strength_map = {
         "prime": {"prime"},
         "okay": {"prime", "okay"},
-        "weak": {"prime", "okay", "weak"}, # "weak" also includes items without a strength property
+        "weak": {
+            "prime",
+            "okay",
+            "weak",
+        },  # "weak" also includes items without a strength property
     }
     allowed_strengths = strength_map.get(args.strength)
 
@@ -133,11 +137,11 @@ def run(args: argparse.Namespace) -> None:
             item_strength = item.get("strength")
 
             # Apply strength filter
-            if args.strength != "weak": # "weak" is the default and means process all
+            if args.strength != "weak":  # "weak" is the default and means process all
                 if not item_strength or item_strength not in allowed_strengths:
                     total_skipped_dilemmas += 1
                     skipped_in_file += 1
-                    continue # Skip this item
+                    continue  # Skip this item
 
             prompt = build_prompt(item)
 
@@ -171,7 +175,9 @@ def run(args: argparse.Namespace) -> None:
             f"Processed {processed_in_file} dilemmas from {dilemmas_path.relative_to(ROOT)}."
         )
         if skipped_in_file > 0:
-            print(f"Skipped {skipped_in_file} dilemmas from {dilemmas_path.relative_to(ROOT)} due to strength filter.")
+            print(
+                f"Skipped {skipped_in_file} dilemmas from {dilemmas_path.relative_to(ROOT)} due to strength filter."
+            )
 
     if args.out:
         out_path = pathlib.Path(args.out)
@@ -191,7 +197,9 @@ def run(args: argparse.Namespace) -> None:
             f"Dry run complete. Processed {total_processed_dilemmas} dilemmas from {len(dilemma_files)} file(s)."
         )
     if total_skipped_dilemmas > 0:
-        print(f"Skipped a total of {total_skipped_dilemmas} dilemmas due to strength filter.")
+        print(
+            f"Skipped a total of {total_skipped_dilemmas} dilemmas due to strength filter."
+        )
 
 
 if __name__ == "__main__":
@@ -220,9 +228,9 @@ if __name__ == "__main__":
         default="okay",
         choices=["prime", "okay", "weak"],
         help="Minimum strength of dilemmas to process. "
-             "'prime': only 'prime'. "
-             "'okay': 'prime' or 'okay'. "
-             "'weak': 'prime', 'okay', 'weak', or unspecified (default).",
+        "'prime': only 'prime'. "
+        "'okay': 'prime' or 'okay'. "
+        "'weak': 'prime', 'okay', 'weak', or unspecified (default).",
     )
     parser.add_argument(
         "--temperature",

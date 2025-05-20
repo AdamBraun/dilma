@@ -206,7 +206,7 @@ if __name__ == "__main__":
         "--results",
         type=pathlib.Path,
         help="Optional path to an LLM results JSONL file or a directory containing "
-             "LLM results JSONL files to parse for value-label distribution.",
+        "LLM results JSONL files to parse for value-label distribution.",
     )
     args = parser.parse_args()
 
@@ -230,15 +230,21 @@ if __name__ == "__main__":
             if results_path.suffix == ".jsonl":
                 result_files_to_process.append(results_path)
             else:
-                print(f"⚠️ Specified results file is not a .jsonl file: {results_path}. Skipping CSV generation.")
+                print(
+                    f"⚠️ Specified results file is not a .jsonl file: {results_path}. Skipping CSV generation."
+                )
         elif results_path.is_dir():
             found_files = sorted(list(results_path.glob("*.jsonl")))
             if not found_files:
-                print(f"⚠️ No .jsonl files found in results directory: {results_path}. Skipping CSV generation.")
+                print(
+                    f"⚠️ No .jsonl files found in results directory: {results_path}. Skipping CSV generation."
+                )
             else:
                 result_files_to_process.extend(found_files)
         else:
-            print(f"⚠️ Results path is not a valid file or directory: {results_path}. Skipping CSV generation.")
+            print(
+                f"⚠️ Results path is not a valid file or directory: {results_path}. Skipping CSV generation."
+            )
 
         if not result_files_to_process:
             print("No result files to process.")

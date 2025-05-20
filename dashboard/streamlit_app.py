@@ -112,7 +112,9 @@ if not dl_df_full.empty and "tractate" in dl_df_full.columns:
     tractates = sorted(dl_df_full["tractate"].unique())
 else:
     tractates = []
-    st.warning("No tractate data found. Dilemma files may be missing in 'data/dilemmas/'.")
+    st.warning(
+        "No tractate data found. Dilemma files may be missing in 'data/dilemmas/'."
+    )
 
 current_tract = st.session_state.get("sel_tractate", "All")
 if current_tract not in ["All"] + tractates:
@@ -167,11 +169,7 @@ if sel_tractate != "All":
         run_df = run_df[run_df["dilemma_id"].isin(dl_df["id"])]
 
 # Apply model filter to run_df (after tractate filter applied)
-if (
-    sel_model != "All"
-    and not run_df.empty
-    and "model_name" in run_df.columns
-):
+if sel_model != "All" and not run_df.empty and "model_name" in run_df.columns:
     run_df = run_df[run_df["model_name"] == sel_model]
 
 # -----------------------------------------------------------------------------
@@ -260,4 +258,4 @@ else:
 st.subheader("Dilemmas")
 # This table uses the page-specific filtered dl_df
 show_cols = ["id", "title", "vignette", "option_A_text", "option_B_text"]
-st.dataframe(dl_df[show_cols], use_container_width=True) 
+st.dataframe(dl_df[show_cols], use_container_width=True)

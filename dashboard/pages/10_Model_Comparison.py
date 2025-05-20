@@ -91,7 +91,9 @@ if not dl_df_full.empty and "tractate" in dl_df_full.columns:
     tractate_options = ["All"] + sorted(dl_df_full["tractate"].unique())
 else:
     tractate_options = ["All"]
-    st.warning("No tractate data found. Dilemma files may be missing in 'data/dilemmas/'.")
+    st.warning(
+        "No tractate data found. Dilemma files may be missing in 'data/dilemmas/'."
+    )
 
 current_tract = st.session_state.get("sel_tractate", "All")
 if current_tract not in tractate_options:
