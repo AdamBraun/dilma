@@ -21,11 +21,18 @@ Usage examples:
         --recursive \
         --dry
 
-    # Real run, save outputs from a single file
+    # Real run with OpenAI, save outputs from a single file
     OPENAI_API_KEY=... python runners/prompt_runner.py \
         --model gpt-4o \
         --dilemmas data/dilemmas/nezikin/bava_metzia.jsonl \
         --out results/bava_metzia_gpt4o.jsonl
+
+    # Real run with Grok, save outputs from a single file
+    XAI_API_KEY=... python runners/prompt_runner.py \
+        --model grok-3-mini \
+        --dilemmas data/dilemmas/nezikin/bava_metzia.jsonl \
+        --out results/bava_metzia_grok3mini.jsonl \
+        --reasoning-effort high
 
     # Real run, save combined outputs from all *.jsonl in a directory
     OPENAI_API_KEY=... python runners/prompt_runner.py \
@@ -43,14 +50,14 @@ import datetime as _dt
 import json
 import pathlib
 import sys
+import os
 from typing import Iterable, List, Dict, Any
 
 try:
     from openai import OpenAI  # pip install openai>=1.0
-
-    client = OpenAI()  # real client
+    OPENAI_AVAILABLE = True
 except ModuleNotFoundError:
-    client = None  # allows --dry runs without the package
+    OPENAI_AVAILABLE = False
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
@@ -79,16 +86,36 @@ def build_prompt(item: Dict[str, Any]) -> str:
     )
 
 
-def call_openai(prompt: str, model: str, temperature: float) -> str:
-    if client is None:
+def call_llm(prompt: str, model: str, temperature: float, reasoning_effort: str | None) -> str:
+    if not OPENAI_AVAILABLE:
         raise RuntimeError(
             "openai package missing. Install with `pip install openai` or use --dry."
         )
-    rsp = client.chat.completions.create(
-        model=model,
-        messages=[{"role": "user", "content": prompt}],
-        temperature=temperature,
-    )
+
+    params = {
+        "model": model,
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": temperature,
+    }
+
+    if model.startswith("grok-"):
+        api_key = os.getenv("XAI_API_KEY")
+        if not api_key:
+            raise RuntimeError(
+                "XAI_API_KEY environment variable not set for Grok models. Needed unless --dry is used."
+            )
+        client = OpenAI(base_url="https://api.x.ai/v1", api_key=api_key)
+        if reasoning_effort:
+            params["reasoning_effort"] = reasoning_effort
+    else:
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            raise RuntimeError(
+                "OPENAI_API_KEY environment variable not set for OpenAI models. Needed unless --dry is used."
+            )
+        client = OpenAI(api_key=api_key)
+
+    rsp = client.chat.completions.create(**params)
     return rsp.choices[0].message.content.strip()
 
 
@@ -154,7 +181,7 @@ def run(args: argparse.Namespace) -> None:
                 print()
                 answer = ""
             else:
-                answer = call_openai(prompt, args.model, args.temperature)
+                answer = call_llm(prompt, args.model, args.temperature, args.reasoning_effort)
                 print(f"{item['id']} → {answer[:80]}…")
 
             out_rows.append(
@@ -204,7 +231,7 @@ def run(args: argparse.Namespace) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run Dilma dilemmas through an LLM")
-    parser.add_argument("--model", default="gpt-4o", help="Chat model to query")
+    parser.add_argument("--model", default="gpt-4o", help="Chat model to query (e.g., gpt-4o, grok-3-mini)")
     parser.add_argument(
         "--dilemmas",
         required=True,
@@ -225,7 +252,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--strength",
-        default="okay",
+        default="weak",
         choices=["prime", "okay", "weak"],
         help="Minimum strength of dilemmas to process. "
         "'prime': only 'prime'. "
@@ -237,5 +264,11 @@ if __name__ == "__main__":
         type=float,
         default=0.0,
         help="Sampling temperature for the model (e.g., 0.0 for deterministic, 0.7 for creative). Default: 0.0",
+    )
+    parser.add_argument(
+        "--reasoning-effort",
+        type=str,
+        default=None,
+        help="Reasoning effort for Grok models (e.g., low, medium, high). Only used if model starts with 'grok-'.",
     )
     run(parser.parse_args())
