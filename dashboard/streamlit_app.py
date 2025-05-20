@@ -193,6 +193,11 @@ else:
                 )
                 diff.columns = pd.MultiIndex.from_product([["Δ"], diff.columns])
 
+                # Determine which axes actually have a non-zero difference to populate the dropdown
+                axes_with_diff = [
+                    ax for ax in diff.index if diff.loc[ax].abs().sum() > 0
+                ]
+
                 table = pd.concat([pivot, diff], axis=1).sort_index(
                     axis=1
                 )  # Sort columns for consistent display
@@ -207,7 +212,6 @@ else:
                     color="#4c72b0",
                     label="Other-leaning Δ",
                 )
-                # For self-leaning delta, ensure it's plotted on the negative side if diff is positive
                 ax_comp.barh(
                     diff.index,
                     -diff[("Δ", "self")],
@@ -221,6 +225,14 @@ else:
 
                 # --- DILEMMA-LEVEL DIFF TABLE START ---
                 st.markdown("### Per-dilemma choice differences")
+
+                # Axis filter UI for dilemma-level diff (only axes that have diff)
+                axis_filter_options = ["All"] + axes_with_diff
+                sel_axis_filter = st.selectbox(
+                    "Filter by Bipolar Axis (for dilemma list):",
+                    axis_filter_options,
+                    key="dilemma_diff_axis_filter",
+                )
 
                 # Helper to map dilemma options to tags
                 letter_to_tags = {}
@@ -297,38 +309,77 @@ else:
 
                             # merge titles for readability (dl_df is already appropriately filtered by tractate)
                             diff_q = diff_q.merge(
-                                dl_df[["id", "title"]],
+                                dl_df[
+                                    ["id", "title", "option_A_tags", "option_B_tags"]
+                                ],  # Ensure tags are merged
                                 left_index=True,
                                 right_on="id",
                                 how="left",
                             )
 
-                            # Select and rename columns for display
-                            display_columns = [
-                                "id",
-                                "title",
-                                model_a,
-                                model_b,
-                                "Δ_pole_viz",
-                            ]
-                            # Filter out rows where title might be NaN if merge failed for some IDs
-                            diff_q_display = diff_q[display_columns].dropna(
-                                subset=["title"]
-                            )
+                            # Apply Axis Filter to diff_q
+                            if sel_axis_filter != "All":
+                                axis_left_tag, axis_right_tag = axes[sel_axis_filter]
 
-                            st.dataframe(
-                                diff_q_display.rename(
-                                    columns={
-                                        model_a: f"Choice ({model_a})",
-                                        model_b: f"Choice ({model_b})",
-                                        "Δ_pole_viz": "Δ Pole (B ← A)",
-                                    }
-                                ),
-                                use_container_width=True,
-                            )
+                                def check_dilemma_axis_tags(
+                                    row, left_tag_to_check, right_tag_to_check
+                                ):
+                                    tags_a_list = (
+                                        row["option_A_tags"].split("|")
+                                        if pd.notna(row["option_A_tags"])
+                                        else []
+                                    )
+                                    tags_b_list = (
+                                        row["option_B_tags"].split("|")
+                                        if pd.notna(row["option_B_tags"])
+                                        else []
+                                    )
+                                    return (
+                                        (left_tag_to_check in tags_a_list)
+                                        or (right_tag_to_check in tags_a_list)
+                                        or (left_tag_to_check in tags_b_list)
+                                        or (right_tag_to_check in tags_b_list)
+                                    )
+
+                                diff_q = diff_q[
+                                    diff_q.apply(
+                                        check_dilemma_axis_tags,
+                                        args=(axis_left_tag, axis_right_tag),
+                                        axis=1,
+                                    )
+                                ]
+
+                            if not diff_q.empty:
+                                # Select and rename columns for display
+                                display_columns = [
+                                    "id",
+                                    "title",
+                                    model_a,
+                                    model_b,
+                                    "Δ_pole_viz",
+                                ]
+                                # Filter out rows where title might be NaN if merge failed for some IDs
+                                diff_q_display = diff_q[display_columns].dropna(
+                                    subset=["title"]
+                                )
+
+                                st.dataframe(
+                                    diff_q_display.rename(
+                                        columns={
+                                            model_a: f"Choice ({model_a})",
+                                            model_b: f"Choice ({model_b})",
+                                            "Δ_pole_viz": "Δ Pole (B ← A)",
+                                        }
+                                    ),
+                                    use_container_width=True,
+                                )
+                            else:
+                                st.write(
+                                    "Models made identical choices for all dilemmas in this set (or no common dilemmas with choices)."
+                                )
                         else:
                             st.write(
-                                "Models made identical choices for all dilemmas in this set (or no common dilemmas with choices). "
+                                "No data available for dilemma-level comparison with current model selections."
                             )
                     else:
                         st.write(
