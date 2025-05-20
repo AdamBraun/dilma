@@ -191,14 +191,43 @@ else:
                         .apply(lambda x: right_tag in x)
                         .sum()
                     )
-                    model_total_invalid_n = (subset["choice_id"] == "INVALID").sum()
+                    # Calculate axis-specific invalid count
+                    count_invalid_for_this_axis = 0
+                    # Get dilemmas where the current model chose "INVALID"
+                    invalid_choices_df = subset[subset["choice_id"] == "INVALID"]
+
+                    if not invalid_choices_df.empty and not current_dl_df.empty:
+                        # Merge these invalid choices with the dilemma details (which have option tags)
+                        # We only need 'dilemma_id' from invalid_choices_df for the merge
+                        # and 'id', 'option_A_tags', 'option_B_tags' from current_dl_df
+                        merged_invalids_with_dilemma_tags = pd.merge(
+                            invalid_choices_df[['dilemma_id']],
+                            current_dl_df[['id', 'option_A_tags', 'option_B_tags']],
+                            left_on='dilemma_id',
+                            right_on='id', # 'id' is the dilemma identifier in current_dl_df
+                            how='left'
+                        )
+
+                        for _idx, row in merged_invalids_with_dilemma_tags.iterrows():
+                            # Safely get tag strings and split them into lists
+                            tags_a_str = row.get("option_A_tags")
+                            tags_b_str = row.get("option_B_tags")
+                            
+                            tags_a = tags_a_str.split("|") if pd.notna(tags_a_str) and tags_a_str else []
+                            tags_b = tags_b_str.split("|") if pd.notna(tags_b_str) and tags_b_str else []
+                            
+                            # Check if the dilemma's options (A or B) have tags matching the current axis poles
+                            if ((left_tag in tags_a) or (right_tag in tags_a) or
+                               (left_tag in tags_b) or (right_tag in tags_b)):
+                                count_invalid_for_this_axis += 1
+                    
                     data.append(
                         {
                             "axis": axis,
                             "model_name": mid_model_name,
                             "self": current_axis_self_n,
                             "other": current_axis_other_n,
-                            "invalid": model_total_invalid_n,
+                            "invalid": count_invalid_for_this_axis, # Use axis-specific count
                         }
                     )
 
