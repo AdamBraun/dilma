@@ -122,115 +122,209 @@ def call_llm(
     return rsp.choices[0].message.content.strip()
 
 
-def run(args: argparse.Namespace) -> None:
-    input_path = pathlib.Path(args.dilemmas).resolve()
-    if not input_path.exists():
-        sys.exit(f"❌ Path not found: {input_path}")
-
+def _get_dilemma_files(base_path: pathlib.Path, recursive: bool) -> List[pathlib.Path]:
+    """Helper to find all *.jsonl files from a given base path."""
     dilemma_files: List[pathlib.Path] = []
-    if input_path.is_file():
-        if input_path.suffix == ".jsonl":
-            dilemma_files.append(input_path)
+    if not base_path.exists():
+        return dilemma_files # Return empty if path doesn't exist
+
+    if base_path.is_file():
+        if base_path.suffix == ".jsonl":
+            dilemma_files.append(base_path)
         else:
-            sys.exit(f"❌ Input file is not a .jsonl file: {input_path}")
-    elif input_path.is_dir():
-        if args.recursive:
-            dilemma_files.extend(sorted(input_path.rglob("*.jsonl")))
+            # This case should ideally be handled by the caller, but good to be safe
+            print(f"⚠️ Warning: Expected a .jsonl file, but got: {base_path}", file=sys.stderr)
+    elif base_path.is_dir():
+        if recursive:
+            dilemma_files.extend(sorted(base_path.rglob("*.jsonl")))
         else:
-            dilemma_files.extend(sorted(input_path.glob("*.jsonl")))
+            dilemma_files.extend(sorted(base_path.glob("*.jsonl")))
         if not dilemma_files:
-            sys.exit(f"❌ No *.jsonl files found in directory: {input_path}")
+            # This is an informational message, not an error to exit on here
+            print(f"ℹ️ No *.jsonl files found in directory: {base_path}", file=sys.stderr)
     else:
-        sys.exit(f"❌ Input path is not a file or directory: {input_path}")
+        # This case should ideally be handled by the caller
+        print(f"⚠️ Warning: Path is not a file or directory: {base_path}", file=sys.stderr)
+    return dilemma_files
 
-    out_rows: List[Dict[str, Any]] = []
-    total_processed_dilemmas = 0
-    total_skipped_dilemmas = 0
 
-    # Define strength hierarchies
-    strength_map = {
-        "prime": {"prime"},
-        "okay": {"prime", "okay"},
-        "weak": {
-            "prime",
-            "okay",
-            "weak",
-        },  # "weak" also includes items without a strength property
-    }
-    allowed_strengths = strength_map.get(args.strength)
+def _process_files(
+    dilemma_files_list: List[pathlib.Path],
+    dilemma_type: str,
+    args: argparse.Namespace,
+    allowed_strengths: set | None,
+    dry_run_items_printed_so_far: int,
+) -> tuple[List[Dict[str, Any]], int, int, int]:
+    """Processes a list of dilemma files (original or neutral) and returns results."""
+    out_rows_for_type: List[Dict[str, Any]] = []
+    processed_for_type_count = 0
+    skipped_for_type_count = 0
 
-    for dilemmas_path in dilemma_files:
-        print(f"Processing file: {dilemmas_path.relative_to(ROOT)}...")
+    for dilemmas_path in dilemma_files_list:
+        print(
+            f"Processing {dilemma_type} file: {dilemmas_path.relative_to(ROOT)}..."
+        )
         processed_in_file = 0
         skipped_in_file = 0
         for item in iter_jsonl(dilemmas_path):
             item_strength = item.get("strength")
 
-            # Apply strength filter
-            if args.strength != "weak":  # "weak" is the default and means process all
+            if args.strength != "weak":
                 if not item_strength or item_strength not in allowed_strengths:
-                    total_skipped_dilemmas += 1
+                    skipped_for_type_count += 1
                     skipped_in_file += 1
-                    continue  # Skip this item
+                    continue
 
             prompt = build_prompt(item)
 
             if args.dry:
-                if total_processed_dilemmas > 0 or processed_in_file > 0:
-                    print("\n" + "=" * 79)  # Separator for multiple dilemmas/files
+                if dry_run_items_printed_so_far > 0: # Check overall count
+                    print("\n" + "=" * 79)
                 else:
-                    print("=" * 79)
+                    # First item ever in a dry run, or first after a previous file in dry run
+                    if processed_in_file > 0 : # Check if it's not the first in *this* file
+                         print("\n" + "=" * 79)
+                    else:
+                        print("=" * 79)
+
                 print(prompt)
                 print()
                 answer = ""
+                dry_run_items_printed_so_far +=1
             else:
                 answer = call_llm(
                     prompt, args.model, args.temperature, args.reasoning_effort
                 )
-                print(f"{item['id']} → {answer[:80]}…")
+                print(f"{item['id']} ({dilemma_type}) → {answer[:70]}…")
 
-            out_rows.append(
+            out_rows_for_type.append(
                 {
                     "id": item["id"],
                     "model": args.model,
                     "timestamp": _dt.datetime.utcnow().isoformat() + "Z",
                     "prompt": prompt,
                     "answer": answer,
-                    "source_file": str(
-                        dilemmas_path.relative_to(ROOT)
-                    ),  # Add source file
+                    "source_file": str(dilemmas_path.relative_to(ROOT)),
+                    "dilemma_type": dilemma_type,  # Add dilemma_type
                 }
             )
             processed_in_file += 1
-            total_processed_dilemmas += 1
+            processed_for_type_count += 1
         print(
-            f"Processed {processed_in_file} dilemmas from {dilemmas_path.relative_to(ROOT)}."
+            f"Processed {processed_in_file} {dilemma_type} dilemmas from {dilemmas_path.relative_to(ROOT)}."
         )
         if skipped_in_file > 0:
             print(
-                f"Skipped {skipped_in_file} dilemmas from {dilemmas_path.relative_to(ROOT)} due to strength filter."
+                f"Skipped {skipped_in_file} {dilemma_type} dilemmas from {dilemmas_path.relative_to(ROOT)} due to strength filter."
             )
+    return out_rows_for_type, processed_for_type_count, skipped_for_type_count, dry_run_items_printed_so_far
+
+
+def run(args: argparse.Namespace) -> None:
+    input_path = pathlib.Path(args.dilemmas).resolve()
+    if not input_path.exists():
+        sys.exit(f"❌ Path not found: {input_path}")
+
+    original_dilemma_files = _get_dilemma_files(input_path, args.recursive)
+
+    if not original_dilemma_files:
+        # Check if it was a file and not .jsonl, or a dir with no .jsonl files
+        if input_path.is_file() and input_path.suffix != ".jsonl":
+            sys.exit(f"❌ Input file is not a .jsonl file: {input_path}")
+        elif input_path.is_dir():
+            sys.exit(f"❌ No *.jsonl files found in directory: {input_path} (recursive={args.recursive})")
+        else: # Should not happen given initial exists() check, but as a fallback
+            sys.exit(f"❌ No *.jsonl files could be sourced from: {input_path}")
+
+
+    # Determine neutral path
+    neutral_input_path_str = str(input_path)
+    if "dilemmas" in input_path.parts:
+        neutral_input_path_str = str(input_path).replace("/dilemmas/", "/dilemmas-neutral/", 1) # Replace only first instance
+        neutral_input_path = pathlib.Path(neutral_input_path_str).resolve()
+        neutral_dilemma_files = _get_dilemma_files(neutral_input_path, args.recursive)
+        if neutral_dilemma_files:
+            print(f"Found neutral dilemmas at: {neutral_input_path.relative_to(ROOT)}")
+        else:
+            print(f"No neutral dilemmas found at expected path: {neutral_input_path.relative_to(ROOT)}")
+            neutral_dilemma_files = [] # Ensure it's an empty list
+    else:
+        print("Input path does not contain 'dilemmas' directory, skipping search for neutral dilemmas.")
+        neutral_dilemma_files = []
+
+
+    all_out_rows: List[Dict[str, Any]] = []
+    grand_total_processed_dilemmas = 0
+    grand_total_skipped_dilemmas = 0
+    dry_run_print_counter = 0 # Counter for items printed in dry run
+
+    strength_map = {
+        "prime": {"prime"},
+        "okay": {"prime", "okay"},
+        "weak": {"prime", "okay", "weak"},
+    }
+    allowed_strengths = strength_map.get(args.strength)
+
+    # Process original dilemmas
+    if original_dilemma_files:
+        print("\n--- Processing original dilemmas ---")
+        (
+            original_out_rows,
+            original_processed,
+            original_skipped,
+            dry_run_print_counter,
+        ) = _process_files(
+            original_dilemma_files,
+            "original",
+            args,
+            allowed_strengths,
+            dry_run_print_counter,
+        )
+        all_out_rows.extend(original_out_rows)
+        grand_total_processed_dilemmas += original_processed
+        grand_total_skipped_dilemmas += original_skipped
+
+    # Process neutral dilemmas
+    if neutral_dilemma_files:
+        print("\n--- Processing neutral dilemmas ---")
+        (
+            neutral_out_rows,
+            neutral_processed,
+            neutral_skipped,
+            dry_run_print_counter, # Pass the updated counter
+        ) = _process_files(
+            neutral_dilemma_files,
+            "neutral",
+            args,
+            allowed_strengths,
+            dry_run_print_counter,
+        )
+        all_out_rows.extend(neutral_out_rows)
+        grand_total_processed_dilemmas += neutral_processed
+        grand_total_skipped_dilemmas += neutral_skipped
+    
+    total_files_processed = len(original_dilemma_files) + len(neutral_dilemma_files)
 
     if args.out:
         out_path = pathlib.Path(args.out)
         out_path.parent.mkdir(parents=True, exist_ok=True)
         with out_path.open("w", encoding="utf-8") as fh:
-            for row in out_rows:
+            for row in all_out_rows: # Use all_out_rows
                 fh.write(json.dumps(row, ensure_ascii=False) + "\n")
         print(
-            f"Saved {len(out_rows)} total results from {len(dilemma_files)} file(s) → {out_path}"
+            f"Saved {len(all_out_rows)} total results from {total_files_processed} file(s) → {out_path}"
         )
     elif not args.dry:
         print(
-            f"Processed {total_processed_dilemmas} dilemmas from {len(dilemma_files)} file(s). No --out path specified, results not saved."
+            f"Processed {grand_total_processed_dilemmas} dilemmas from {total_files_processed} file(s). No --out path specified, results not saved."
         )
     else:  # Dry run, no output file
         print(
-            f"Dry run complete. Processed {total_processed_dilemmas} dilemmas from {len(dilemma_files)} file(s)."
+            f"Dry run complete. Processed {grand_total_processed_dilemmas} dilemmas from {total_files_processed} file(s)."
         )
-    if total_skipped_dilemmas > 0:
+    if grand_total_skipped_dilemmas > 0:
         print(
-            f"Skipped a total of {total_skipped_dilemmas} dilemmas due to strength filter."
+            f"Skipped a total of {grand_total_skipped_dilemmas} dilemmas due to strength filter."
         )
 
 
