@@ -135,7 +135,8 @@ def call_llm(
         client = OpenAI(api_key=api_key)
 
     rsp = client.chat.completions.create(**params)
-    return rsp.choices[0].message.content.strip()
+    content = rsp.choices[0].message.content
+    return content.strip() if content else ""
 
 
 def _get_dilemma_files(base_path: pathlib.Path, recursive: bool) -> List[pathlib.Path]:
@@ -177,6 +178,7 @@ def _process_files(
     skipped_for_type_count = 0
 
     for dilemmas_path in dilemma_files_list:
+        current_file_out_rows: List[Dict[str, Any]] = [] # For checkpointing
         print(
             f"Processing {dilemma_type} file: {dilemmas_path.relative_to(ROOT)}..."
         )
@@ -226,6 +228,8 @@ def _process_files(
             )
             processed_in_file += 1
             processed_for_type_count += 1
+            current_file_out_rows.append(out_rows_for_type[-1]) # Add to current file's list for checkpoint
+
         print(
             f"Processed {processed_in_file} {dilemma_type} dilemmas from {dilemmas_path.relative_to(ROOT)}."
         )
@@ -233,6 +237,20 @@ def _process_files(
             print(
                 f"Skipped {skipped_in_file} {dilemma_type} dilemmas from {dilemmas_path.relative_to(ROOT)} due to strength filter."
             )
+        
+        # Checkpointing logic
+        if args.out and not args.dry and current_file_out_rows:
+            out_path = pathlib.Path(args.out)
+            checkpoint_file_name = f"{out_path.stem}_checkpoint_{dilemma_type}_{dilemmas_path.stem}{out_path.suffix}"
+            checkpoint_path = out_path.parent / checkpoint_file_name
+            checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+            with checkpoint_path.open("w", encoding="utf-8") as fh_checkpoint:
+                for row in current_file_out_rows:
+                    fh_checkpoint.write(json.dumps(row, ensure_ascii=False) + "\n")
+            print(
+                f"Saved checkpoint for {dilemmas_path.stem} ({dilemma_type}) with {len(current_file_out_rows)} results to {checkpoint_path}"
+            )
+
     return out_rows_for_type, processed_for_type_count, skipped_for_type_count, dry_run_items_printed_so_far
 
 
