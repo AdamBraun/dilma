@@ -55,6 +55,7 @@ from typing import Iterable, List, Dict, Any
 
 try:
     from openai import OpenAI  # pip install openai>=1.0
+
     OPENAI_AVAILABLE = True
 except ModuleNotFoundError:
     OPENAI_AVAILABLE = False
@@ -86,7 +87,9 @@ def build_prompt(item: Dict[str, Any]) -> str:
     )
 
 
-def call_llm(prompt: str, model: str, temperature: float, reasoning_effort: str | None) -> str:
+def call_llm(
+    prompt: str, model: str, temperature: float, reasoning_effort: str | None
+) -> str:
     if not OPENAI_AVAILABLE:
         raise RuntimeError(
             "openai package missing. Install with `pip install openai` or use --dry."
@@ -181,7 +184,9 @@ def run(args: argparse.Namespace) -> None:
                 print()
                 answer = ""
             else:
-                answer = call_llm(prompt, args.model, args.temperature, args.reasoning_effort)
+                answer = call_llm(
+                    prompt, args.model, args.temperature, args.reasoning_effort
+                )
                 print(f"{item['id']} → {answer[:80]}…")
 
             out_rows.append(
@@ -231,7 +236,11 @@ def run(args: argparse.Namespace) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run Dilma dilemmas through an LLM")
-    parser.add_argument("--model", default="gpt-4o", help="Chat model to query (e.g., gpt-4o, grok-3-mini)")
+    parser.add_argument(
+        "--model",
+        default="gpt-4o",
+        help="Chat model to query (e.g., gpt-4o, grok-3-mini)",
+    )
     parser.add_argument(
         "--dilemmas",
         required=True,
