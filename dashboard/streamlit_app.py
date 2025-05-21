@@ -120,8 +120,8 @@ current_tract = st.session_state.get("sel_tractate", "All")
 if current_tract not in ["All"] + tractates:
     current_tract = "All"
 
-# Layout two columns so filters share the same line
-col1, col2 = st.columns(2)
+# Layout three columns for filters
+col1, col2, col3 = st.columns(3)
 
 with col1:
     sel_tractate = st.selectbox(
@@ -132,24 +132,61 @@ with col1:
         help="Filter all charts by tractate",
     )
 
-# --- Compute model list based on selected tractate ---
-run_df_for_model_opts = run_df_original.copy()
-if sel_tractate != "All" and not run_df_for_model_opts.empty:
-    # Need list of dilemma ids for tractate to filter run_df
-    d_ids_for_tractate = dl_df_full[dl_df_full["tractate"] == sel_tractate]["id"]
-    run_df_for_model_opts = run_df_for_model_opts[
-        run_df_for_model_opts["dilemma_id"].isin(d_ids_for_tractate)
-    ]
+# Persist tractate selection
+st.session_state.sel_tractate = sel_tractate
 
+# Apply tractate filter first, as it affects options for other filters
+dl_df_filtered_by_tractate = dl_df_full.copy()
+run_df_filtered_by_tractate = run_df_original.copy()
+
+if sel_tractate != "All":
+    dl_df_filtered_by_tractate = dl_df_filtered_by_tractate[dl_df_filtered_by_tractate["tractate"] == sel_tractate]
+    if not run_df_filtered_by_tractate.empty:
+        run_df_filtered_by_tractate = run_df_filtered_by_tractate[
+            run_df_filtered_by_tractate["dilemma_id"].isin(dl_df_filtered_by_tractate["id"])
+        ]
+
+
+# --- Dilemma Type Filter ---
+with col2:
+    dilemma_type_options = ["All", "Original", "Neutral"]
+    current_dilemma_type = st.session_state.get("sel_dilemma_type", "All")
+    if current_dilemma_type not in dilemma_type_options:
+        current_dilemma_type = "All"
+    
+    sel_dilemma_type = st.selectbox(
+        "Dilemma Type",
+        dilemma_type_options,
+        index=dilemma_type_options.index(current_dilemma_type),
+        key="dilemma_type_filter_top",
+        help="Filter results by dilemma type (Original or Neutral language). Requires 'dilemma_type' column in CSV.",
+    )
+
+# Persist dilemma type selection
+st.session_state.sel_dilemma_type = sel_dilemma_type
+
+# Apply dilemma_type filter to a copy of tractate-filtered run_df
+run_df_filtered_by_type = run_df_filtered_by_tractate.copy()
+if sel_dilemma_type != "All":
+    if "dilemma_type" in run_df_filtered_by_type.columns:
+        run_df_filtered_by_type = run_df_filtered_by_type[run_df_filtered_by_type["dilemma_type"] == sel_dilemma_type.lower()]
+    else:
+        if not run_df_filtered_by_type.empty : # Only warn if there was data to filter
+             st.warning("`dilemma_type` column not found in run data. Cannot filter by dilemma type. Please ensure your CSV includes this column.")
+
+
+# --- Compute model list based on selected tractate AND dilemma_type ---
+# Use run_df_filtered_by_type to determine available models
 model_opts = []
-if not run_df_for_model_opts.empty and "model_name" in run_df_for_model_opts.columns:
-    model_opts = sorted(run_df_for_model_opts["model_name"].unique())
+if not run_df_filtered_by_type.empty and "model_name" in run_df_filtered_by_type.columns:
+    model_opts = sorted(run_df_filtered_by_type["model_name"].unique())
+
 
 current_model = st.session_state.get("sel_model", "All")
 if current_model not in ["All"] + model_opts:
-    current_model = "All"
+    current_model = "All" # Default to "All" if current selection is not valid
 
-with col2:
+with col3: # Changed from col2 to col3
     sel_model = st.selectbox(
         "Model",
         ["All"] + model_opts,
@@ -158,17 +195,15 @@ with col2:
         help="Filter all charts by model (main display)",
     )
 
-# Persist selections across pages
-st.session_state.sel_tractate = sel_tractate
+# Persist selections across pages (sel_tractate and sel_dilemma_type already persisted)
 st.session_state.sel_model = sel_model
 
-# Apply tractate filter to dl_df and run_df for this page
-if sel_tractate != "All":
-    dl_df = dl_df[dl_df["tractate"] == sel_tractate]
-    if not run_df.empty:
-        run_df = run_df[run_df["dilemma_id"].isin(dl_df["id"])]
+# Apply filters to dl_df and run_df for this page
+# dl_df is primarily filtered by tractate for display purposes
+dl_df = dl_df_filtered_by_tractate.copy() 
 
-# Apply model filter to run_df (after tractate filter applied)
+# run_df starts from the tractate and type filtered data, then applies model filter
+run_df = run_df_filtered_by_type.copy()
 if sel_model != "All" and not run_df.empty and "model_name" in run_df.columns:
     run_df = run_df[run_df["model_name"] == sel_model]
 

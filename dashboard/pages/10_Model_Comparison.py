@@ -111,12 +111,32 @@ sel_tractate = st.selectbox(
 st.session_state.sel_tractate = sel_tractate
 
 # -----------------------------------------------------------------------------
+# Dilemma Type Filter (synced with main page)
+# -----------------------------------------------------------------------------
+# Add Dilemma Type filter, similar to the main page
+dilemma_type_options = ["All", "Original", "Neutral"]
+current_dilemma_type = st.session_state.get("sel_dilemma_type", "All") # Get from session state
+if current_dilemma_type not in dilemma_type_options:
+    current_dilemma_type = "All"
+
+sel_dilemma_type = st.selectbox(
+    "Dilemma Type",
+    dilemma_type_options,
+    index=dilemma_type_options.index(current_dilemma_type),
+    key="dilemma_type_filter_comp", # Unique key for this page
+    help="Filter results by dilemma type (Original or Neutral language). Affects model comparison."
+)
+
+# Persist selection for all pages
+st.session_state.sel_dilemma_type = sel_dilemma_type
+
+# -----------------------------------------------------------------------------
 # Session State & Context Display
 # -----------------------------------------------------------------------------
 # Other filters that may come from the main page (e.g., model)
 sel_model_from_main = st.session_state.get("sel_model", None)
 
-# Filter data based on tractate
+# Filter data based on tractate AND dilemma_type
 current_dl_df = dl_df_full.copy()
 current_run_df = run_df_full.copy()
 
@@ -126,6 +146,17 @@ if sel_tractate != "All":
         current_run_df = current_run_df[
             current_run_df["dilemma_id"].isin(current_dl_df["id"])
         ]
+
+# Apply dilemma_type filter to current_run_df
+if sel_dilemma_type != "All":
+    if "dilemma_type" in current_run_df.columns:
+        current_run_df = current_run_df[current_run_df["dilemma_type"] == sel_dilemma_type.lower()]
+    else:
+        if not current_run_df.empty: # Only warn if there was data to filter
+            st.warning(
+                "`dilemma_type` column not found in run data for model comparison. "
+                "Please ensure your CSV includes this column."
+            )
 
 # -----------------------------------------------------------------------------
 # Model Comparison Setup
