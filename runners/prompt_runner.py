@@ -34,6 +34,12 @@ Usage examples:
         --out results/bava_metzia_grok3mini.jsonl \
         --reasoning-effort high
 
+    # Real run with Gemini, save outputs from a single file
+    GEMINI_API_KEY=... python runners/prompt_runner.py \
+        --model gemini-1.5-flash \
+        --dilemmas data/dilemmas/nezikin/bava_metzia.jsonl \
+        --out results/bava_metzia_gemini15flash.jsonl
+
     # Real run, save combined outputs from all *.jsonl in a directory
     OPENAI_API_KEY=... python runners/prompt_runner.py \
         --model gpt-4o \
@@ -110,6 +116,16 @@ def call_llm(
         client = OpenAI(base_url="https://api.x.ai/v1", api_key=api_key)
         if reasoning_effort:
             params["reasoning_effort"] = reasoning_effort
+    elif model.startswith("gemini-"):
+        api_key = os.getenv("GEMINI_API_KEY")
+        if not api_key:
+            raise RuntimeError(
+                "GEMINI_API_KEY environment variable not set for Gemini models. Needed unless --dry is used."
+            )
+        client = OpenAI(
+            base_url="https://generativelanguage.googleapis.com/v1beta/",
+            api_key=api_key,
+        )
     else:
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
@@ -333,7 +349,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--model",
         default="gpt-4o",
-        help="Chat model to query (e.g., gpt-4o, grok-3-mini)",
+        help="Chat model to query (e.g., gpt-4o, grok-3-mini, gemini-1.5-flash)",
     )
     parser.add_argument(
         "--dilemmas",
