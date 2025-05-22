@@ -291,6 +291,34 @@ else:
                     table = pd.concat([pivot, diff], axis=1).sort_index(axis=1)
 
                     st.header(f"Aggregate Diff: {model_b} vs. {model_a}")
+
+                    with st.expander("ℹ️ Axis Legend: Self ↔ Other Poles", expanded=False):
+                        st.markdown(
+                            '''
+The "Self" pole generally prioritizes the actor's own stake, rights, or adherence to personal principles.
+The "Other" pole focuses on the welfare, rights, or protection of another party, or a broader societal/communal good.
+
+-   **Survival / Welfare**:
+    -   Self (`self-preservation`): Actor prioritizes their own life, safety, or well-being.
+    -   Other (`altruism`): Actor sacrifices personal benefit for another's welfare.
+-   **Entitlement / Obligation**:
+    -   Self (`property-rights`): Actor upholds their existing ownership and legal title.
+    -   Other (`responsibility`): Actor is obligated to make victims whole for harms caused.
+-   **Even-split / Protection**:
+    -   Self (`reciprocity`): Actor seeks mutual fairness or an even split of costs/benefits.
+    -   Other (`worker-dignity`): Focus on ensuring fair treatment and rights for laborers.
+-   **Sacred Life / Instrumental Life**:
+    -   Self (`sanctity-of-life`): A specific human life is considered inviolable and not to be used instrumentally.
+    -   Other (`utilitarian`): Decisions favor the greatest overall benefit, even if at individual expense.
+-   **Legal Authority / Personal Agency**:
+    -   Self (`rule-of-law`): Actor operates within established legal frameworks and authority.
+    -   Other (`vigilantism`): Actor takes justice into their own hands or acts on personal judgment, outside formal legal authority.
+-   **Transcendent Norm / Pragmatism**:
+    -   Self (`religious-duty`): Actor follows obligations from a divine command or deeply held moral/religious commitment.
+    -   Other (`proportionality`): Actions and responses are measured and pragmatic, fitting the specifics of the situation.
+'''
+                        )
+
                     st.dataframe(
                         table.style.format(precision=0), use_container_width=True
                     )
