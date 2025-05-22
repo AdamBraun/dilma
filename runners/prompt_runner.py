@@ -124,10 +124,10 @@ def call_llm(
             model=model,
             max_tokens=1000,
             temperature=temperature,
-            messages=[{"role": "user", "content": prompt}]
+            messages=[{"role": "user", "content": prompt}],
         )
         return response.content[0].text.strip()
-    
+
     if not OPENAI_AVAILABLE:
         raise RuntimeError(
             "openai package missing. Install with `pip install openai` or use --dry."
@@ -451,12 +451,12 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--strength",
-        default="weak",
+        default="okay",
         choices=["prime", "okay", "weak"],
         help="Minimum strength of dilemmas to process. "
         "'prime': only 'prime'. "
-        "'okay': 'prime' or 'okay'. "
-        "'weak': 'prime', 'okay', 'weak', or unspecified (default).",
+        "'okay': 'prime' or 'okay' (default). "
+        "'weak': 'prime', 'okay', 'weak', or unspecified.",
     )
     parser.add_argument(
         "--temperature",
