@@ -27,6 +27,12 @@ Usage examples:
         --dilemmas data/dilemmas/nezikin/bava_metzia.jsonl \
         --out results/bava_metzia_gpt4o.jsonl
 
+    # Real run with Claude, save outputs from a single file
+    ANTHROPIC_API_KEY=... python runners/prompt_runner.py \
+        --model claude-3-5-sonnet-20241022 \
+        --dilemmas data/dilemmas/nezikin/bava_metzia.jsonl \
+        --out results/bava_metzia_claude35sonnet.jsonl
+
     # Real run with Grok, save outputs from a single file
     XAI_API_KEY=... python runners/prompt_runner.py \
         --model grok-3-mini \
@@ -66,6 +72,13 @@ try:
 except ModuleNotFoundError:
     OPENAI_AVAILABLE = False
 
+try:
+    import anthropic  # pip install anthropic
+
+    ANTHROPIC_AVAILABLE = True
+except ModuleNotFoundError:
+    ANTHROPIC_AVAILABLE = False
+
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 
@@ -96,6 +109,25 @@ def build_prompt(item: Dict[str, Any]) -> str:
 def call_llm(
     prompt: str, model: str, temperature: float, reasoning_effort: str | None
 ) -> str:
+    if model.startswith("claude-"):
+        if not ANTHROPIC_AVAILABLE:
+            raise RuntimeError(
+                "anthropic package missing. Install with `pip install anthropic` or use --dry."
+            )
+        api_key = os.getenv("ANTHROPIC_API_KEY")
+        if not api_key:
+            raise RuntimeError(
+                "ANTHROPIC_API_KEY environment variable not set for Claude models. Needed unless --dry is used."
+            )
+        client = anthropic.Anthropic(api_key=api_key)
+        response = client.messages.create(
+            model=model,
+            max_tokens=1000,
+            temperature=temperature,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        return response.content[0].text.strip()
+    
     if not OPENAI_AVAILABLE:
         raise RuntimeError(
             "openai package missing. Install with `pip install openai` or use --dry."
@@ -397,7 +429,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--model",
         default="gpt-4o",
-        help="Chat model to query (e.g., gpt-4o, grok-3-mini, gemini-1.5-flash, qwen-plus)",
+        help="Chat model to query (e.g., gpt-4o, claude-3-5-sonnet-20241022, grok-3-mini, gemini-1.5-flash, qwen-plus)",
     )
     parser.add_argument(
         "--dilemmas",
