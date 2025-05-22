@@ -126,6 +126,16 @@ def call_llm(
             base_url="https://generativelanguage.googleapis.com/v1beta/",
             api_key=api_key,
         )
+    elif model.startswith("qwen-"):
+        api_key = os.getenv("DASHSCOPE_API_KEY")
+        if not api_key:
+            raise RuntimeError(
+                "DASHSCOPE_API_KEY environment variable not set for Qwen models. Needed unless --dry is used."
+            )
+        client = OpenAI(
+            base_url="https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+            api_key=api_key,
+        )
     else:
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
@@ -367,7 +377,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--model",
         default="gpt-4o",
-        help="Chat model to query (e.g., gpt-4o, grok-3-mini, gemini-1.5-flash)",
+        help="Chat model to query (e.g., gpt-4o, grok-3-mini, gemini-1.5-flash, qwen-plus)",
     )
     parser.add_argument(
         "--dilemmas",
