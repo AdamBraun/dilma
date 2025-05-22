@@ -26,17 +26,20 @@ The sugyot of _Bava Metzia_—our pilot tractate—already expose trade‑offs
 dilma/
 ├── data/
 │   ├── dilemmas/
-│   │   ├── bava_metzia.jsonl        # pilot set (31 items)
-│   │   └── ...                      # future tractates & midrashim
+│   │   ├── bava_metzia.jsonl         # pilot set (31 items)
+│   │   └── ...                       # future tractates & midrashim
+|   └── dilemmas-neutral/             # `dilemmas/` mirror structure with neutral language
+|       ├── bava_metzia-neutral.jsonl # neutral language bava_metzia.jsonl version
+|       └── ...
 │   └── annotations/
-│       └── value_labels.yaml        # mapping of options → abstract value tags
+│       └── value_labels.yaml         # mapping of options → abstract value tags
 ├── runners/
-│   ├── prompt_runner.py             # sends vignettes to model endpoints
-│   └── scorer.py                    # maps answers → value vectors
+│   ├── prompt_runner.py              # sends vignettes to model endpoints
+│   └── scorer.py                     # maps answers → value vectors
 ├── dashboard/
-│   └── streamlit_app.py             # live drift & trend charts
-├── docs/                            # white‑papers, citation list
-└── README.md                        # you are here
+│   └── streamlit_app.py              # live drift & trend charts
+├── docs/                             # white‑papers, citation list
+└── README.md                         # you are here
 ```
 
 ### JSONL schema (`data/dilemmas/*.jsonl`)
@@ -100,9 +103,23 @@ See `docs/annotation_protocol.md` for the controlled vocabulary of value tags.
 ## 🛣️ Road‑map
 
 - [x] Pilot set: _Bava Metzia_ (31 dilemmas)
-- [ ] _Bava Kamma_ & _Sanhedrin_ edge‑cases
+- [x] Compare neutral language with original (free translation of) texts
+- [x] Complete Zeraim order
+- [ ] Complete Moe'ed order
+- [ ] Complete Nashim order
+- [x] Complete Nezikin order
+- [ ] Complete Kodashim order
+- [ ] Complete Taharot order
+- [ ] `Explain-then-choose` vs `Choose-then-explain` - Tests whether requiring rationale first drags models toward “responsibility” pole.
+- [ ] **Temperature sweep (0 → 0.8)** - See if higher randomness spreads choices or keeps the same polarity.
+- [ ] **Prompt swap** - reverse the order of options
+- [ ] **A/B vs Multi-choice** - adding a third “compromise” option will likely widen differences again; worth testing.
+- [ ] **Add contradiction check** - Provide two dilemmas that secretly encode the same law in opposite wording. If the model follows Halacha it will answer inconsistently with its own stated principle; if it follows principle, it stays coherent.
+- [ ] **Weekly** cron job polling all the supported models
+- [ ] **Logistic drift test** - Schedule the same diff weekly. If a provider updates alignment, a bar jump even before release notes mention it.
+- [ ] Per-dilemma diff table - Identify which 3–4 scenarios drive swings
 - [ ] Midrashic narratives (moral imagination)
-- [ ] Multi‑lingual vignettes (Ivrit, Arabic, Spanish)
+- [ ] Multi‑lingual vignettes (Hebrew, Arabic, Spanish)
 - [ ] Fine‑tuned evaluation harness (ruff, OpenAI evals‑v2)
 
 ---
@@ -118,5 +135,3 @@ All original dataset content © 2025 **Dilma Project** – CC‑BY‑4.0. Source
 ## 🙏 Acknowledgements
 
 Inspired by ETHICS, MoralBench, and centuries of hevruta‑style debate.
-
-_L'hibanot u‑lilmod — built to question and to learn._
