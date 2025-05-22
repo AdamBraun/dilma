@@ -1,0 +1,49 @@
+name: CI Checks
+
+on:
+  pull_request:
+    branches: [main] # Assuming 'main' is your primary branch
+  push:
+    branches: [main]
+
+jobs:
+  build_and_test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -l {0} # Ensures conda commands are available in run steps
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Miniconda and create Conda Environment
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          python-version: "3.10" # Matching your local environment
+          auto-activate-base: false
+          activate-environment: dilma # Creates and activates 'dilma' env with Python 3.10
+
+      - name: Display Conda environment details
+        run: |
+          echo "CONDA_DEFAULT_ENV: $CONDA_DEFAULT_ENV"
+          conda info
+          conda list
+          which python
+
+      - name: Install dependencies
+        run: |
+          # The 'dilma' environment is active here
+          python -m pip install --upgrade pip
+          # Dependencies identified from our previous steps:
+          pip install black ruff pyyaml streamlit pandas 
+          # Add any other dependencies required by prompt_runner.py or streamlit_app.py if they arise
+
+      - name: Run make test (linting and schema checks)
+        run: make test # Uses the activated 'dilma' environment
+
+      - name: Run prompt runner (dry mode) on Bava Metzia
+        run: python runners/prompt_runner.py --model gpt-4o --dilemmas data/dilemmas/nezikin/bava_metzia.jsonl --dry
+
+      - name: Run prompt runner (dry mode) on Bava Kamma
+        run: python runners/prompt_runner.py --model gpt-4o --dilemmas data/dilemmas/nezikin/bava_kamma.jsonl --dry

@@ -1,3 +1,5 @@
+[![CI Checks](https://github.com/AdamBraun/dilma/actions/workflows/ci.yml/badge.svg)](https://github.com/AdamBraun/dilma/actions/workflows/ci.yml)
+
 # 🕮 Dilma — Oral‑Torah Dilemma Benchmark
 
 A continuously‑updated, open repository of **ethical and interpersonal dilemmas drawn from the Oral Torah** (Talmud, Midrash, later responsa) for evaluating the emergent value‑preferences of large language models (LLMs).
@@ -12,9 +14,9 @@ A continuously‑updated, open repository of **ethical and interpersonal dilemma
 | ------------------------------------ | -------------------------------------------------------------------------------------------- |
 | Western‑centric, utilitarian framing | Duty‑based, precedent‑driven cases with multiple legitimate answers                          |
 | Static CSV corpora                   | **Daily pipeline** that queries public APIs and logs drift metrics                           |
-| Simple right/wrong labels            | **Value‑vector annotation** (e.g., self‑preservation · communal obligation · fiduciary duty) |
+| Simple right/wrong labels            | **Value‑vector annotation** (e.g., self‑preservation · communal obligation · fiduciary duty) |
 
-The sugyot of *Bava Metzia*—our pilot tractate—already expose trade‑offs such as *self vs. other* (One Canteen 62a), *privacy vs. cost* (Fence 102a), and *worker dignity vs. flexibility* (Timely Wages 110b).  Expanding to the full Oral Torah will give hundreds of orthogonal probes.
+The sugyot of _Bava Metzia_—our pilot tractate—already expose trade‑offs such as _self vs. other_ (One Canteen 62a), _privacy vs. cost_ (Fence 102a), and _worker dignity vs. flexibility_ (Timely Wages 110b). Expanding to the full Oral Torah will give hundreds of orthogonal probes.
 
 ---
 
@@ -42,7 +44,7 @@ dilma/
 ```jsonc
 {
   "id": "bm-005",
-  "source": "Bava Metzia 62a",
+  "source": "Bava Metzia 62a",
   "title": "One canteen in the desert",
   "vignette": "Two travelers share a path…",
   "options": [
@@ -60,7 +62,7 @@ dilma/
 }
 ```
 
-*No accepted halakhic ruling is stored; only the competing voices.*
+_No accepted halakhic ruling is stored; only the competing voices._
 
 ---
 
@@ -87,7 +89,7 @@ The dashboard automatically detects new `results/*.parquet` files and updates tr
 
 ### Translation & QA
 
-*Help us keep the English crisp and add Hebrew/Arabic/… localizations.*
+_Help us keep the English crisp and add Hebrew/Arabic/… localizations._
 
 ### Annotation guide
 
@@ -97,19 +99,19 @@ See `docs/annotation_protocol.md` for the controlled vocabulary of value tags.
 
 ## 🛣️ Road‑map
 
-* [x] Pilot set: *Bava Metzia* (31 dilemmas)
-* [ ] *Bava Kamma* & *Sanhedrin* edge‑cases
-* [ ] Midrashic narratives (moral imagination)
-* [ ] Multi‑lingual vignettes (Ivrit, Arabic, Spanish)
-* [ ] Fine‑tuned evaluation harness (ruff, OpenAI evals‑v2)
+- [x] Pilot set: _Bava Metzia_ (31 dilemmas)
+- [ ] _Bava Kamma_ & _Sanhedrin_ edge‑cases
+- [ ] Midrashic narratives (moral imagination)
+- [ ] Multi‑lingual vignettes (Ivrit, Arabic, Spanish)
+- [ ] Fine‑tuned evaluation harness (ruff, OpenAI evals‑v2)
 
 ---
 
 ## 📜 License & Attribution
 
-All original dataset content © 2025 **Dilma Project** – CC‑BY‑4.0.  Source texts are public‑domain or used under fair‑use scholarship.
+All original dataset content © 2025 **Dilma Project** – CC‑BY‑4.0. Source texts are public‑domain or used under fair‑use scholarship.
 
-> Cite this repo as: *Dilma v0.1*, May 2025.
+> Cite this repo as: _Dilma v0.1_, May 2025.
 
 ---
 
@@ -117,4 +119,4 @@ All original dataset content © 2025 **Dilma Project** – CC‑BY‑4.0.  Sour
 
 Inspired by ETHICS, MoralBench, and centuries of hevruta‑style debate.
 
-*L’hibanot u‑lilmod — built to question and to learn.*
+_L'hibanot u‑lilmod — built to question and to learn._
