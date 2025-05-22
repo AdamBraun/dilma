@@ -153,14 +153,17 @@ def _get_dilemma_files(base_path: pathlib.Path, recursive: bool) -> List[pathlib
     """Helper to find all *.jsonl files from a given base path."""
     dilemma_files: List[pathlib.Path] = []
     if not base_path.exists():
-        return dilemma_files # Return empty if path doesn't exist
+        return dilemma_files  # Return empty if path doesn't exist
 
     if base_path.is_file():
         if base_path.suffix == ".jsonl":
             dilemma_files.append(base_path)
         else:
             # This case should ideally be handled by the caller, but good to be safe
-            print(f"⚠️ Warning: Expected a .jsonl file, but got: {base_path}", file=sys.stderr)
+            print(
+                f"⚠️ Warning: Expected a .jsonl file, but got: {base_path}",
+                file=sys.stderr,
+            )
     elif base_path.is_dir():
         if recursive:
             dilemma_files.extend(sorted(base_path.rglob("*.jsonl")))
@@ -168,10 +171,14 @@ def _get_dilemma_files(base_path: pathlib.Path, recursive: bool) -> List[pathlib
             dilemma_files.extend(sorted(base_path.glob("*.jsonl")))
         if not dilemma_files:
             # This is an informational message, not an error to exit on here
-            print(f"ℹ️ No *.jsonl files found in directory: {base_path}", file=sys.stderr)
+            print(
+                f"ℹ️ No *.jsonl files found in directory: {base_path}", file=sys.stderr
+            )
     else:
         # This case should ideally be handled by the caller
-        print(f"⚠️ Warning: Path is not a file or directory: {base_path}", file=sys.stderr)
+        print(
+            f"⚠️ Warning: Path is not a file or directory: {base_path}", file=sys.stderr
+        )
     return dilemma_files
 
 
@@ -188,10 +195,8 @@ def _process_files(
     skipped_for_type_count = 0
 
     for dilemmas_path in dilemma_files_list:
-        current_file_out_rows: List[Dict[str, Any]] = [] # For checkpointing
-        print(
-            f"Processing {dilemma_type} file: {dilemmas_path.relative_to(ROOT)}..."
-        )
+        current_file_out_rows: List[Dict[str, Any]] = []  # For checkpointing
+        print(f"Processing {dilemma_type} file: {dilemmas_path.relative_to(ROOT)}...")
         processed_in_file = 0
         skipped_in_file = 0
         for item in iter_jsonl(dilemmas_path):
@@ -206,19 +211,21 @@ def _process_files(
             prompt = build_prompt(item)
 
             if args.dry:
-                if dry_run_items_printed_so_far > 0: # Check overall count
+                if dry_run_items_printed_so_far > 0:  # Check overall count
                     print("\n" + "=" * 79)
                 else:
                     # First item ever in a dry run, or first after a previous file in dry run
-                    if processed_in_file > 0 : # Check if it's not the first in *this* file
-                         print("\n" + "=" * 79)
+                    if (
+                        processed_in_file > 0
+                    ):  # Check if it's not the first in *this* file
+                        print("\n" + "=" * 79)
                     else:
                         print("=" * 79)
 
                 print(prompt)
                 print()
                 answer = ""
-                dry_run_items_printed_so_far +=1
+                dry_run_items_printed_so_far += 1
             else:
                 answer = call_llm(
                     prompt, args.model, args.temperature, args.reasoning_effort
@@ -238,7 +245,9 @@ def _process_files(
             )
             processed_in_file += 1
             processed_for_type_count += 1
-            current_file_out_rows.append(out_rows_for_type[-1]) # Add to current file's list for checkpoint
+            current_file_out_rows.append(
+                out_rows_for_type[-1]
+            )  # Add to current file's list for checkpoint
 
         print(
             f"Processed {processed_in_file} {dilemma_type} dilemmas from {dilemmas_path.relative_to(ROOT)}."
@@ -247,7 +256,7 @@ def _process_files(
             print(
                 f"Skipped {skipped_in_file} {dilemma_type} dilemmas from {dilemmas_path.relative_to(ROOT)} due to strength filter."
             )
-        
+
         # Checkpointing logic
         if args.out and not args.dry and current_file_out_rows:
             out_path = pathlib.Path(args.out)
@@ -261,7 +270,12 @@ def _process_files(
                 f"Saved checkpoint for {dilemmas_path.stem} ({dilemma_type}) with {len(current_file_out_rows)} results to {checkpoint_path}"
             )
 
-    return out_rows_for_type, processed_for_type_count, skipped_for_type_count, dry_run_items_printed_so_far
+    return (
+        out_rows_for_type,
+        processed_for_type_count,
+        skipped_for_type_count,
+        dry_run_items_printed_so_far,
+    )
 
 
 def run(args: argparse.Namespace) -> None:
@@ -276,31 +290,37 @@ def run(args: argparse.Namespace) -> None:
         if input_path.is_file() and input_path.suffix != ".jsonl":
             sys.exit(f"❌ Input file is not a .jsonl file: {input_path}")
         elif input_path.is_dir():
-            sys.exit(f"❌ No *.jsonl files found in directory: {input_path} (recursive={args.recursive})")
-        else: # Should not happen given initial exists() check, but as a fallback
+            sys.exit(
+                f"❌ No *.jsonl files found in directory: {input_path} (recursive={args.recursive})"
+            )
+        else:  # Should not happen given initial exists() check, but as a fallback
             sys.exit(f"❌ No *.jsonl files could be sourced from: {input_path}")
-
 
     # Determine neutral path
     neutral_input_path_str = str(input_path)
     if "dilemmas" in input_path.parts:
-        neutral_input_path_str = str(input_path).replace("/dilemmas/", "/dilemmas-neutral/", 1) # Replace only first instance
+        neutral_input_path_str = str(input_path).replace(
+            "/dilemmas/", "/dilemmas-neutral/", 1
+        )  # Replace only first instance
         neutral_input_path = pathlib.Path(neutral_input_path_str).resolve()
         neutral_dilemma_files = _get_dilemma_files(neutral_input_path, args.recursive)
         if neutral_dilemma_files:
             print(f"Found neutral dilemmas at: {neutral_input_path.relative_to(ROOT)}")
         else:
-            print(f"No neutral dilemmas found at expected path: {neutral_input_path.relative_to(ROOT)}")
-            neutral_dilemma_files = [] # Ensure it's an empty list
+            print(
+                f"No neutral dilemmas found at expected path: {neutral_input_path.relative_to(ROOT)}"
+            )
+            neutral_dilemma_files = []  # Ensure it's an empty list
     else:
-        print("Input path does not contain 'dilemmas' directory, skipping search for neutral dilemmas.")
+        print(
+            "Input path does not contain 'dilemmas' directory, skipping search for neutral dilemmas."
+        )
         neutral_dilemma_files = []
-
 
     all_out_rows: List[Dict[str, Any]] = []
     grand_total_processed_dilemmas = 0
     grand_total_skipped_dilemmas = 0
-    dry_run_print_counter = 0 # Counter for items printed in dry run
+    dry_run_print_counter = 0  # Counter for items printed in dry run
 
     strength_map = {
         "prime": {"prime"},
@@ -335,7 +355,7 @@ def run(args: argparse.Namespace) -> None:
             neutral_out_rows,
             neutral_processed,
             neutral_skipped,
-            dry_run_print_counter, # Pass the updated counter
+            dry_run_print_counter,  # Pass the updated counter
         ) = _process_files(
             neutral_dilemma_files,
             "neutral",
@@ -346,14 +366,14 @@ def run(args: argparse.Namespace) -> None:
         all_out_rows.extend(neutral_out_rows)
         grand_total_processed_dilemmas += neutral_processed
         grand_total_skipped_dilemmas += neutral_skipped
-    
+
     total_files_processed = len(original_dilemma_files) + len(neutral_dilemma_files)
 
     if args.out:
         out_path = pathlib.Path(args.out)
         out_path.parent.mkdir(parents=True, exist_ok=True)
         with out_path.open("w", encoding="utf-8") as fh:
-            for row in all_out_rows: # Use all_out_rows
+            for row in all_out_rows:  # Use all_out_rows
                 fh.write(json.dumps(row, ensure_ascii=False) + "\n")
         print(
             f"Saved {len(all_out_rows)} total results from {total_files_processed} file(s) → {out_path}"

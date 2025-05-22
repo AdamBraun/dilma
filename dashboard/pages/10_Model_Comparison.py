@@ -115,7 +115,9 @@ st.session_state.sel_tractate = sel_tractate
 # -----------------------------------------------------------------------------
 # Add Dilemma Type filter, similar to the main page
 dilemma_type_options = ["All", "Original", "Neutral"]
-current_dilemma_type = st.session_state.get("sel_dilemma_type", "All") # Get from session state
+current_dilemma_type = st.session_state.get(
+    "sel_dilemma_type", "All"
+)  # Get from session state
 if current_dilemma_type not in dilemma_type_options:
     current_dilemma_type = "All"
 
@@ -123,8 +125,8 @@ sel_dilemma_type = st.selectbox(
     "Dilemma Type",
     dilemma_type_options,
     index=dilemma_type_options.index(current_dilemma_type),
-    key="dilemma_type_filter_comp", # Unique key for this page
-    help="Filter results by dilemma type (Original or Neutral language). Affects model comparison."
+    key="dilemma_type_filter_comp",  # Unique key for this page
+    help="Filter results by dilemma type (Original or Neutral language). Affects model comparison.",
 )
 
 # Persist selection for all pages
@@ -150,9 +152,11 @@ if sel_tractate != "All":
 # Apply dilemma_type filter to current_run_df
 if sel_dilemma_type != "All":
     if "dilemma_type" in current_run_df.columns:
-        current_run_df = current_run_df[current_run_df["dilemma_type"] == sel_dilemma_type.lower()]
+        current_run_df = current_run_df[
+            current_run_df["dilemma_type"] == sel_dilemma_type.lower()
+        ]
     else:
-        if not current_run_df.empty: # Only warn if there was data to filter
+        if not current_run_df.empty:  # Only warn if there was data to filter
             st.warning(
                 "`dilemma_type` column not found in run data for model comparison. "
                 "Please ensure your CSV includes this column."
@@ -292,9 +296,11 @@ else:
 
                     st.header(f"Aggregate Diff: {model_b} vs. {model_a}")
 
-                    with st.expander("ℹ️ Axis Legend: Self ↔ Other Poles", expanded=False):
+                    with st.expander(
+                        "ℹ️ Axis Legend: Self ↔ Other Poles", expanded=False
+                    ):
                         st.markdown(
-                            '''
+                            """
 The "Self" pole generally prioritizes the actor's own stake, rights, or adherence to personal principles.
 The "Other" pole focuses on the welfare, rights, or protection of another party, or a broader societal/communal good.
 
@@ -316,7 +322,7 @@ The "Other" pole focuses on the welfare, rights, or protection of another party,
 -   **Transcendent Norm / Pragmatism**:
     -   Self (`religious-duty`): Actor follows obligations from a divine command or deeply held moral/religious commitment.
     -   Other (`proportionality`): Actions and responses are measured and pragmatic, fitting the specifics of the situation.
-'''
+"""
                         )
 
                     st.dataframe(
@@ -381,7 +387,9 @@ The "Other" pole focuses on the welfare, rights, or protection of another party,
 
                     if not comp_df.empty:
                         # Ensure no duplicates for pivot operation based on dilemma_id and model_name
-                        comp_df_for_pivot = comp_df.drop_duplicates(subset=['dilemma_id', 'model_name'], keep='first')
+                        comp_df_for_pivot = comp_df.drop_duplicates(
+                            subset=["dilemma_id", "model_name"], keep="first"
+                        )
                         pivot_q = comp_df_for_pivot.pivot(
                             index="dilemma_id", columns="model_name", values="choice_id"
                         )
@@ -415,7 +423,7 @@ The "Other" pole focuses on the welfare, rights, or protection of another party,
                                         [model_a, model_b]
                                     ].iterrows()
                                 ]
-                                
+
                                 # Prepare current_dl_df for merge by selecting necessary columns and dropping duplicates
                                 dl_df_for_merge = current_dl_df[
                                     [
@@ -426,58 +434,103 @@ The "Other" pole focuses on the welfare, rights, or protection of another party,
                                         "option_A_text",
                                         "option_B_text",
                                     ]
-                                ].drop_duplicates(subset=['id'])
+                                ].drop_duplicates(subset=["id"])
 
                                 diff_q = diff_q.merge(
                                     dl_df_for_merge,
-                                    left_index=True, # diff_q's index is dilemma_id
-                                    right_on="id",   # dl_df_for_merge's dilemma identifier
-                                    how="left",      # Keep all rows from diff_q
+                                    left_index=True,  # diff_q's index is dilemma_id
+                                    right_on="id",  # dl_df_for_merge's dilemma identifier
+                                    how="left",  # Keep all rows from diff_q
                                 )
 
                                 # Define helper to get actual choice text
-                                def get_choice_text(row, model_key, option_a_text_key, option_b_text_key):
-                                    choice_id = row.get(model_key) # e.g., model_a column which has 'A', 'B', 'INVALID'
+                                def get_choice_text(
+                                    row, model_key, option_a_text_key, option_b_text_key
+                                ):
+                                    choice_id = row.get(
+                                        model_key
+                                    )  # e.g., model_a column which has 'A', 'B', 'INVALID'
                                     text_a = row.get(option_a_text_key)
                                     text_b = row.get(option_b_text_key)
 
                                     if choice_id == "A":
-                                        return text_a if pd.notna(text_a) else "A (text unavailable)"
+                                        return (
+                                            text_a
+                                            if pd.notna(text_a)
+                                            else "A (text unavailable)"
+                                        )
                                     elif choice_id == "B":
-                                        return text_b if pd.notna(text_b) else "B (text unavailable)"
+                                        return (
+                                            text_b
+                                            if pd.notna(text_b)
+                                            else "B (text unavailable)"
+                                        )
                                     elif choice_id == "INVALID":
                                         return "INVALID"
                                     return f"Unknown ({choice_id})"
 
                                 # Add choice text columns
                                 # Check if option_A_text and option_B_text columns exist after merge
-                                if 'option_A_text' in diff_q.columns and 'option_B_text' in diff_q.columns:
-                                    diff_q[f'{model_a}_choice_text'] = diff_q.apply(
-                                        get_choice_text, args=(model_a, "option_A_text", "option_B_text"), axis=1
+                                if (
+                                    "option_A_text" in diff_q.columns
+                                    and "option_B_text" in diff_q.columns
+                                ):
+                                    diff_q[f"{model_a}_choice_text"] = diff_q.apply(
+                                        get_choice_text,
+                                        args=(
+                                            model_a,
+                                            "option_A_text",
+                                            "option_B_text",
+                                        ),
+                                        axis=1,
                                     )
-                                    diff_q[f'{model_b}_choice_text'] = diff_q.apply(
-                                        get_choice_text, args=(model_b, "option_A_text", "option_B_text"), axis=1
+                                    diff_q[f"{model_b}_choice_text"] = diff_q.apply(
+                                        get_choice_text,
+                                        args=(
+                                            model_b,
+                                            "option_A_text",
+                                            "option_B_text",
+                                        ),
+                                        axis=1,
                                     )
                                 else:
-                                    st.warning("Option text columns ('option_A_text', 'option_B_text') not found after merge. Displaying choice IDs instead of text.")
+                                    st.warning(
+                                        "Option text columns ('option_A_text', 'option_B_text') not found after merge. Displaying choice IDs instead of text."
+                                    )
                                     # Fallback to choice IDs if text columns are missing
-                                    diff_q[f'{model_a}_choice_text'] = diff_q[model_a]
-                                    diff_q[f'{model_b}_choice_text'] = diff_q[model_b]
-
+                                    diff_q[f"{model_a}_choice_text"] = diff_q[model_a]
+                                    diff_q[f"{model_b}_choice_text"] = diff_q[model_b]
 
                                 # Apply axis filter AFTER choice texts have been generated
                                 if sel_axis_filter != "All":
                                     # Ensure tag columns are present before attempting to filter
-                                    if "option_A_tags" in diff_q.columns and "option_B_tags" in diff_q.columns:
-                                        axis_left_tag, axis_right_tag = axes[sel_axis_filter]
+                                    if (
+                                        "option_A_tags" in diff_q.columns
+                                        and "option_B_tags" in diff_q.columns
+                                    ):
+                                        axis_left_tag, axis_right_tag = axes[
+                                            sel_axis_filter
+                                        ]
 
                                         def check_dilemma_axis_tags(row, l_tag, r_tag):
                                             tags_a_str = row.get("option_A_tags")
                                             tags_b_str = row.get("option_B_tags")
-                                            tags_a = tags_a_str.split("|") if pd.notna(tags_a_str) and tags_a_str else []
-                                            tags_b = tags_b_str.split("|") if pd.notna(tags_b_str) and tags_b_str else []
-                                            return (l_tag in tags_a) or (r_tag in tags_a) or \
-                                                   (l_tag in tags_b) or (r_tag in tags_b)
+                                            tags_a = (
+                                                tags_a_str.split("|")
+                                                if pd.notna(tags_a_str) and tags_a_str
+                                                else []
+                                            )
+                                            tags_b = (
+                                                tags_b_str.split("|")
+                                                if pd.notna(tags_b_str) and tags_b_str
+                                                else []
+                                            )
+                                            return (
+                                                (l_tag in tags_a)
+                                                or (r_tag in tags_a)
+                                                or (l_tag in tags_b)
+                                                or (r_tag in tags_b)
+                                            )
 
                                         diff_q = diff_q[
                                             diff_q.apply(
@@ -487,49 +540,65 @@ The "Other" pole focuses on the welfare, rights, or protection of another party,
                                             )
                                         ]
                                     else:
-                                        st.warning("Tag columns ('option_A_tags', 'option_B_tags') missing. Cannot apply axis filter.")
-                                
+                                        st.warning(
+                                            "Tag columns ('option_A_tags', 'option_B_tags') missing. Cannot apply axis filter."
+                                        )
 
                                 if not diff_q.empty:
                                     display_columns = [
                                         "id",
-                                        "title", # Relies on the merge being successful
+                                        "title",  # Relies on the merge being successful
                                         f"{model_a}_choice_text",
                                         f"{model_b}_choice_text",
                                         "Δ_pole_viz",
                                     ]
-                                    
+
                                     # Ensure all columns intended for display actually exist in diff_q
                                     # Particularly, 'title' might be missing if a dilemma_id in diff_q was not in current_dl_df
                                     # and choice text columns if the fallback was hit.
-                                    actual_display_columns = [col for col in display_columns if col in diff_q.columns]
-                                    
-                                    if 'title' not in actual_display_columns:
-                                         # If title is missing, it's a data integrity issue from the merge
-                                         # Add a placeholder or remove it from display
-                                         if 'id' in actual_display_columns: # Check if id exists for a placeholder
-                                             diff_q['title'] = diff_q['id'].apply(lambda x: f"Title unavailable for ID: {x}")
-                                             if 'title' not in actual_display_columns : actual_display_columns.insert(1, 'title') # try to add it back
-                                         # Or, decide to not show title if it's missing, by ensuring it's not in actual_display_columns
+                                    actual_display_columns = [
+                                        col
+                                        for col in display_columns
+                                        if col in diff_q.columns
+                                    ]
+
+                                    if "title" not in actual_display_columns:
+                                        # If title is missing, it's a data integrity issue from the merge
+                                        # Add a placeholder or remove it from display
+                                        if (
+                                            "id" in actual_display_columns
+                                        ):  # Check if id exists for a placeholder
+                                            diff_q["title"] = diff_q["id"].apply(
+                                                lambda x: f"Title unavailable for ID: {x}"
+                                            )
+                                            if "title" not in actual_display_columns:
+                                                actual_display_columns.insert(
+                                                    1, "title"
+                                                )  # try to add it back
+                                        # Or, decide to not show title if it's missing, by ensuring it's not in actual_display_columns
 
                                     if not diff_q[actual_display_columns].empty:
                                         # Drop rows where 'id' is NaN, as 'id' is crucial.
                                         # Title NaNs might be handled by the placeholder logic above or accepted.
-                                        diff_q_display = diff_q[actual_display_columns].dropna(subset=['id'])
-                                        
+                                        diff_q_display = diff_q[
+                                            actual_display_columns
+                                        ].dropna(subset=["id"])
+
                                         st.dataframe(
                                             diff_q_display.rename(
                                                 columns={
                                                     f"{model_a}_choice_text": f"Choice Text ({model_a})",
                                                     f"{model_b}_choice_text": f"Choice Text ({model_b})",
                                                     "Δ_pole_viz": "Δ Pole (B ← A)",
-                                                    "title": "Dilemma Title" # Ensure title column is nicely named
+                                                    "title": "Dilemma Title",  # Ensure title column is nicely named
                                                 }
                                             ),
                                             use_container_width=True,
                                         )
                                     else:
-                                        st.info("No dilemma differences to show after filtering and preparing display data (empty or missing key columns).")
+                                        st.info(
+                                            "No dilemma differences to show after filtering and preparing display data (empty or missing key columns)."
+                                        )
                                 else:
                                     st.info(
                                         "No dilemma differences to show for the selected axis filter."

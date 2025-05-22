@@ -57,7 +57,9 @@ def check_dilemma_files() -> int:
     return errors
 
 
-def parse_runner_output(results_file: pathlib.Path, all_dilemmas: dict) -> List[List[str]]:
+def parse_runner_output(
+    results_file: pathlib.Path, all_dilemmas: dict
+) -> List[List[str]]:
     """Parses a single LLM results JSONL file and returns rows for CSV output."""
     rows_for_csv: List[List[str]] = []
     if not results_file.exists():
@@ -79,15 +81,19 @@ def parse_runner_output(results_file: pathlib.Path, all_dilemmas: dict) -> List[
             dilemma_id = result_obj.get("id")
             answer = result_obj.get("answer", "").strip()
             model_name = result_obj.get("model", "unknown_model")
-            dilemma_type = result_obj.get("dilemma_type", "unknown") # Extract dilemma_type
+            dilemma_type = result_obj.get(
+                "dilemma_type", "unknown"
+            )  # Extract dilemma_type
 
             if not dilemma_id or not answer:
-                print(f"Skipping entry in {results_file.name}:{line_num} with missing id or answer: {result_obj}")
+                print(
+                    f"Skipping entry in {results_file.name}:{line_num} with missing id or answer: {result_obj}"
+                )
                 continue
 
-            parsed_choice_id = "UNPARSEABLE" # Default
+            parsed_choice_id = "UNPARSEABLE"  # Default
             chosen_tags_str = "unparseable"
-            
+
             first_token = answer.split(maxsplit=1)[0].upper().rstrip(".,:;")
 
             if first_token == "A":
@@ -99,39 +105,61 @@ def parse_runner_output(results_file: pathlib.Path, all_dilemmas: dict) -> List[
 
             dilemma_data = all_dilemmas.get(dilemma_id)
             if not dilemma_data:
-                print(f"Dilemma {dilemma_id} from {results_file.name}:{line_num} not found in source files. Marking as UNKNOWN_DILEMMA.")
+                print(
+                    f"Dilemma {dilemma_id} from {results_file.name}:{line_num} not found in source files. Marking as UNKNOWN_DILEMMA."
+                )
                 # chosen_tags_str remains "unparseable" or similar, choice is effectively unknown
-                rows_for_csv.append([dilemma_id, "UNKNOWN_DILEMMA", "error", model_name, dilemma_type])
+                rows_for_csv.append(
+                    [dilemma_id, "UNKNOWN_DILEMMA", "error", model_name, dilemma_type]
+                )
                 continue
 
             if parsed_choice_id == "A":
-                tags = next((
-                    opt.get("tags", []) 
-                    for opt in dilemma_data.get("options", []) 
-                    if opt.get("id") == "A"
-                ), None) # Default to None to distinguish from empty list
-                chosen_tags_str = ",".join(tags) if tags is not None else "error_tag_not_found"
-                if tags is not None and not tags: # Explicitly empty tags list
+                tags = next(
+                    (
+                        opt.get("tags", [])
+                        for opt in dilemma_data.get("options", [])
+                        if opt.get("id") == "A"
+                    ),
+                    None,
+                )  # Default to None to distinguish from empty list
+                chosen_tags_str = (
+                    ",".join(tags) if tags is not None else "error_tag_not_found"
+                )
+                if tags is not None and not tags:  # Explicitly empty tags list
                     chosen_tags_str = "no_tags"
             elif parsed_choice_id == "B":
-                tags = next((
-                    opt.get("tags", []) 
-                    for opt in dilemma_data.get("options", []) 
-                    if opt.get("id") == "B"
-                ), None)
-                chosen_tags_str = ",".join(tags) if tags is not None else "error_tag_not_found"
+                tags = next(
+                    (
+                        opt.get("tags", [])
+                        for opt in dilemma_data.get("options", [])
+                        if opt.get("id") == "B"
+                    ),
+                    None,
+                )
+                chosen_tags_str = (
+                    ",".join(tags) if tags is not None else "error_tag_not_found"
+                )
                 if tags is not None and not tags:
                     chosen_tags_str = "no_tags"
             elif parsed_choice_id == "INVALID":
                 chosen_tags_str = "invalid"
-            else: # UNPARSEABLE
+            else:  # UNPARSEABLE
                 print(
                     f"Warning: Could not parse choice for {dilemma_id} from {results_file.name}:{line_num} answer: '{answer[:50]}...' (First token: '{first_token}')"
                 )
                 # chosen_tags_str is already "unparseable", parsed_choice_id is "UNPARSEABLE"
-            
-            rows_for_csv.append([dilemma_id, parsed_choice_id, chosen_tags_str, model_name, dilemma_type])
-            
+
+            rows_for_csv.append(
+                [
+                    dilemma_id,
+                    parsed_choice_id,
+                    chosen_tags_str,
+                    model_name,
+                    dilemma_type,
+                ]
+            )
+
     return rows_for_csv
 
 
@@ -162,7 +190,9 @@ if __name__ == "__main__":
 
         result_files_to_process = []
         if not results_path.exists():
-            print(f"⚠️ Results path not found: {results_path}. No CSV will be generated/updated.")
+            print(
+                f"⚠️ Results path not found: {results_path}. No CSV will be generated/updated."
+            )
         elif results_path.is_file():
             if results_path.suffix == ".jsonl":
                 result_files_to_process.append(results_path)
@@ -186,12 +216,20 @@ if __name__ == "__main__":
         if not result_files_to_process:
             print("No result files to process for CSV generation.")
         else:
-            print(f"Found {len(result_files_to_process)} result file(s) to process for CSV.")
-            
+            print(
+                f"Found {len(result_files_to_process)} result file(s) to process for CSV."
+            )
+
             output_csv_path = RESULTS_DIR / "value_label_distribution.csv"
             RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-            
-            csv_header = ["dilemma_id", "choice_id", "chosen_value_labels", "model_name", "dilemma_type"]
+
+            csv_header = [
+                "dilemma_id",
+                "choice_id",
+                "chosen_value_labels",
+                "model_name",
+                "dilemma_type",
+            ]
             can_write_to_csv = True
             write_new_header_row = False
 
@@ -199,18 +237,28 @@ if __name__ == "__main__":
                 write_new_header_row = True
             else:
                 try:
-                    with output_csv_path.open("r", newline="", encoding="utf-8") as fh_check:
+                    with output_csv_path.open(
+                        "r", newline="", encoding="utf-8"
+                    ) as fh_check:
                         reader = csv.reader(fh_check)
                         existing_header = next(reader)
                         if "dilemma_type" not in existing_header:
-                            print(f"❌ ERROR: The existing CSV file \n  '{output_csv_path}' \nhas an outdated format (missing 'dilemma_type' column).")
-                            print("To prevent data corruption, please backup/rename this file and re-run the script.")
-                            print("No new data will be appended to this CSV file in this run.")
+                            print(
+                                f"❌ ERROR: The existing CSV file \n  '{output_csv_path}' \nhas an outdated format (missing 'dilemma_type' column)."
+                            )
+                            print(
+                                "To prevent data corruption, please backup/rename this file and re-run the script."
+                            )
+                            print(
+                                "No new data will be appended to this CSV file in this run."
+                            )
                             can_write_to_csv = False
-                except StopIteration: # File exists but is empty
+                except StopIteration:  # File exists but is empty
                     write_new_header_row = True
                 except Exception as e:
-                    print(f"Error reading existing CSV header: {e}. Assuming incompatible.")
+                    print(
+                        f"Error reading existing CSV header: {e}. Assuming incompatible."
+                    )
                     can_write_to_csv = False
 
             master_csv_rows = []
@@ -222,23 +270,33 @@ if __name__ == "__main__":
             if can_write_to_csv:
                 if master_csv_rows:
                     try:
-                        with output_csv_path.open(mode="a", newline="", encoding="utf-8") as fh_csv:
+                        with output_csv_path.open(
+                            mode="a", newline="", encoding="utf-8"
+                        ) as fh_csv:
                             writer = csv.writer(fh_csv)
                             if write_new_header_row:
                                 writer.writerow(csv_header)
                             writer.writerows(master_csv_rows)
-                        print(f"📊 Successfully appended {len(master_csv_rows)} new records to {output_csv_path}")
+                        print(
+                            f"📊 Successfully appended {len(master_csv_rows)} new records to {output_csv_path}"
+                        )
                         if write_new_header_row:
-                            print("(New CSV file created or header written to empty file.)")
+                            print(
+                                "(New CSV file created or header written to empty file.)"
+                            )
                     except IOError as e:
                         print(f"❌ Error writing to CSV file '{output_csv_path}': {e}")
                 else:
                     print("No new valid records found to add to the CSV.")
-            elif master_csv_rows: # Can't write, but had rows
-                 print(f"Parsed {len(master_csv_rows)} records, but CSV writing was skipped due to header incompatibility.")
-            else: # Can't write and no rows, or can write but no rows
+            elif master_csv_rows:  # Can't write, but had rows
+                print(
+                    f"Parsed {len(master_csv_rows)} records, but CSV writing was skipped due to header incompatibility."
+                )
+            else:  # Can't write and no rows, or can write but no rows
                 if not can_write_to_csv:
-                     print("CSV writing skipped due to header incompatibility and no new records were parsed.")
+                    print(
+                        "CSV writing skipped due to header incompatibility and no new records were parsed."
+                    )
                 # else: (can_write_to_csv is true, but no master_csv_rows - covered by "No new valid records...")
 
     if errors:  # Exit with error if dilemma files had issues
