@@ -94,9 +94,9 @@ def iter_jsonl(path: pathlib.Path) -> Iterable[Dict[str, Any]]:
                 raise ValueError(f"{path}:{num} bad JSON → {exc}") from exc
 
 
-def build_prompt(item: Dict[str, Any]) -> str:
+def build_prompt(item: Dict[str, Any], scenario_number: int) -> str:
     """Turn one dilemma row into a chat prompt."""
-    header = f"# {item['title']} (ID: {item['id']})"
+    header = f"# Scenario {scenario_number:03d}"
     options_block = "\n".join(f"{opt['id']}. {opt['text']}" for opt in item["options"])
     return (
         f"{header}\n\n{item['vignette']}\n\n"
@@ -240,7 +240,7 @@ def _process_files(
                     skipped_in_file += 1
                     continue
 
-            prompt = build_prompt(item)
+            prompt = build_prompt(item, processed_in_file + 1)
 
             if args.dry:
                 if dry_run_items_printed_so_far > 0:  # Check overall count
