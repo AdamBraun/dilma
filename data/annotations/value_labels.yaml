@@ -79,3 +79,23 @@ tags:
     description: Willingness to incur personal monetary cost for moral duty
   family-loyalty:
     description: Duty to protect and support family members
+  self-control:
+    description: Restraining one's impulses or waiting despite desire
+  self-discipline:
+    description: Strict personal regimen and adherence to self-imposed rules
+  tradition:
+    description: Respect for long-standing custom and inherited practice
+  prudence:
+    description: Exercising caution and careful judgment before acting
+  fairness:
+    description: Commitment to impartial and equitable treatment
+  legalism:
+    description: Focus on technical compliance with the law over intent
+  peer-pressure:
+    description: Influence from peers encouraging conformity
+  simplification:
+    description: Preferring simple or less burdensome solutions
+  traditional-role:
+    description: Behaving according to customary social expectations
+  trust:
+    description: Confidence in another's reliability or honesty
