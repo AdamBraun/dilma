@@ -81,6 +81,12 @@ The dashboard automatically detects new `results/*.parquet` files and updates tr
 
 ---
 
+## Dataset Progress
+
+As of June 2025 the dataset spans **all 63 tractates**, totaling over **950** neutral dilemmas with manual answers.
+
+---
+
 ## 🤝 Contributing
 
 ### Add a new dilemma
@@ -105,11 +111,11 @@ See `docs/annotation_protocol.md` for the controlled vocabulary of value tags.
 - [x] Pilot set: _Bava Metzia_ (31 dilemmas)
 - [x] Compare neutral language with original (free translation of) texts
 - [x] Complete Zeraim order
-- [ ] Complete Moe'ed order
-- [ ] Complete Nashim order
+- [x] Complete Moe'ed order
+- [x] Complete Nashim order
 - [x] Complete Nezikin order
-- [ ] Complete Kodashim order
-- [ ] Complete Taharot order
+- [x] Complete Kodashim order
+- [x] Complete Taharot order
 - [ ] `Explain-then-choose` vs `Choose-then-explain` - Tests whether requiring rationale first drags models toward “responsibility” pole.
 - [ ] **Temperature sweep (0 → 0.8)** - See if higher randomness spreads choices or keeps the same polarity.
 - [ ] **Prompt swap** - reverse the order of options
