@@ -16,6 +16,7 @@ from typing import List
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 LABELS = ROOT / "data" / "annotations" / "value_labels.yaml"
 DILEMMA_DIR = ROOT / "data" / "dilemmas"
+DILEMMA_NEUTRAL_DIR = ROOT / "data" / "dilemmas-neutral"
 RESULTS_DIR = ROOT / "results"
 
 allowed = set(yaml.safe_load(LABELS.read_text())["tags"].keys())
@@ -33,9 +34,15 @@ def load_all_dilemmas(dilemma_dir: pathlib.Path) -> dict:
     return all_dilemmas
 
 
-def check_dilemma_files() -> int:
+def check_dilemma_files_in_dir(dilemma_dir: pathlib.Path, dir_name: str) -> int:
+    """Check dilemma files in a specific directory."""
     errors = 0
-    for jf in DILEMMA_DIR.rglob("*.jsonl"):
+    if not dilemma_dir.exists():
+        print(f"⚠️ Directory {dir_name} not found: {dilemma_dir}")
+        return errors
+
+    print(f"Checking {dir_name} directory: {dilemma_dir}")
+    for jf in dilemma_dir.rglob("*.jsonl"):
         for ln, line in enumerate(jf.read_text().splitlines(), 1):
             try:
                 obj = json.loads(line)
@@ -54,6 +61,19 @@ def check_dilemma_files() -> int:
                 if bad:
                     print(f"{jf}:{ln} unknown tags {bad} in option {opt['id']}")
                     errors += 1
+    return errors
+
+
+def check_dilemma_files() -> int:
+    """Check dilemma files in both regular and neutral directories."""
+    errors = 0
+
+    # Check regular dilemmas
+    errors += check_dilemma_files_in_dir(DILEMMA_DIR, "dilemmas")
+
+    # Check neutral dilemmas
+    errors += check_dilemma_files_in_dir(DILEMMA_NEUTRAL_DIR, "dilemmas-neutral")
+
     return errors
 
 

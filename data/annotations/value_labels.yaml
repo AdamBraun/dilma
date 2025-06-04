@@ -22,7 +22,7 @@ tags:
   sanctity-of-life:
     description: Inviolability and sacredness of human life; prohibition on unjust killing
   self-sacrifice:
-    description: Voluntary forfeiture of one’s own life or welfare for a higher principle or to save others
+    description: Voluntary forfeiture of one's own life or welfare for a higher principle or to save others
   collective-responsibility:
     description: A group bears consequences for the actions or protection of its members
   utilitarian:
@@ -36,7 +36,7 @@ tags:
   property-vs-life:
     description: Tension between safeguarding property and preserving human life
   maternal-health:
-    description: Protection of a pregnant woman’s life and wellbeing
+    description: Protection of a pregnant woman's life and wellbeing
   potential-life:
     description: Moral status and protection owed to unborn life
   sexual-ethics:
@@ -52,7 +52,7 @@ tags:
   preemptive-justice:
     description: Punishment or restraint justified by predicted future harm
   parental-responsibility:
-    description: Duties of parents or guardians toward a child’s behaviour and welfare
+    description: Duties of parents or guardians toward a child's behaviour and welfare
   religious-duty:
     description: Obligation arising from divine command or religious commitment
   authority:
@@ -66,7 +66,7 @@ tags:
   due-process:
     description: Fair legal procedures before depriving life, liberty, or property
   personal-agency:
-    description: Individual autonomy and responsibility for one’s own words and actions
+    description: Individual autonomy and responsibility for one's own words and actions
   retribution:
     description: Punitive measure proportional to wrongdoing as moral payback
   culpability:
@@ -106,6 +106,12 @@ tags:
   reconciliation:
     description: Restoration of harmonious relations after conflict or disagreement
   humility:
-    description: Recognition of one’s limitations and a modest view of one’s importance
+    description: Recognition of one's limitations and a modest view of one's importance
   hospitality:
     description: Generous and welcoming treatment of guests or strangers
+  collaboration:
+    description: Coordinated effort among multiple actors to achieve a shared, mutually-beneficial outcome
+  integrity:
+    description: Consistent honesty and incorruptibility—actions match stated principles, free of corruption or deceit
+  environmental-stewardship:
+    description: Responsible use, protection, and restoration of natural resources and ecosystems for current and future generations
