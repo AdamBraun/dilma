@@ -34,6 +34,26 @@ def load_all_dilemmas(dilemma_dir: pathlib.Path) -> dict:
     return all_dilemmas
 
 
+def load_all_dilemmas_from_both_dirs() -> dict:
+    """Load dilemmas from both regular and neutral directories."""
+    all_dilemmas = {}
+
+    # Load from regular dilemmas directory
+    if DILEMMA_DIR.exists():
+        regular_dilemmas = load_all_dilemmas(DILEMMA_DIR)
+        all_dilemmas.update(regular_dilemmas)
+        print(f"Loaded {len(regular_dilemmas)} dilemmas from regular directory")
+
+    # Load from neutral dilemmas directory
+    if DILEMMA_NEUTRAL_DIR.exists():
+        neutral_dilemmas = load_all_dilemmas(DILEMMA_NEUTRAL_DIR)
+        all_dilemmas.update(neutral_dilemmas)
+        print(f"Loaded {len(neutral_dilemmas)} dilemmas from neutral directory")
+
+    print(f"Total dilemmas loaded: {len(all_dilemmas)}")
+    return all_dilemmas
+
+
 def check_dilemma_files_in_dir(dilemma_dir: pathlib.Path, dir_name: str) -> int:
     """Check dilemma files in a specific directory."""
     errors = 0
@@ -205,7 +225,7 @@ if __name__ == "__main__":
 
     # Parse results if the argument is provided
     if args.results:
-        all_dilemmas_data = load_all_dilemmas(DILEMMA_DIR)
+        all_dilemmas_data = load_all_dilemmas_from_both_dirs()
         results_path: pathlib.Path = args.results
 
         result_files_to_process = []

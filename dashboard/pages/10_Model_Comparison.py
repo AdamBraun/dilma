@@ -10,6 +10,12 @@ import pandas as pd
 import streamlit as st
 import matplotlib.pyplot as plt
 
+# Import shared configuration
+import sys
+
+sys.path.append(str(pathlib.Path(__file__).resolve().parent.parent))
+from shared_config import axes
+
 # Define ROOT, DILEMMA_DIR, RUN_CSV relative to this file's new location
 # Assuming 'pages' is a subfolder of the Streamlit app's root where dashboard_streamlit_app.py was
 ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -30,11 +36,23 @@ def read_jsonl(fp: pathlib.Path):
             yield json.loads(line)
 
 
-def load_dilemmas() -> pd.DataFrame:
+def load_dilemmas(dilemma_type="original") -> pd.DataFrame:
     rows: List[Dict] = []
-    for jf in DILEMMA_DIR.rglob("*.jsonl"):
+    # Choose directory based on dilemma type
+    if dilemma_type == "neutral":
+        dilemma_dir = ROOT / "data" / "dilemmas-neutral"
+    else:
+        dilemma_dir = ROOT / "data" / "dilemmas"
+    
+    for jf in dilemma_dir.rglob("*.jsonl"):
         order_name = jf.parent.name
         tract = jf.stem
+        # Remove "-neutral" suffix from tract name if present
+        if tract.endswith("-neutral"):
+            tract = tract[:-8]  # Remove "-neutral"
+        # Remove number prefix if present (e.g., "16-yoma" -> "yoma")
+        if "-" in tract and tract.split("-")[0].isdigit():
+            tract = "-".join(tract.split("-")[1:])
         for obj in read_jsonl(jf):
             rows.append(
                 {
@@ -72,43 +90,12 @@ def load_run() -> pd.DataFrame:
 # Global Definitions & Initial Data Load for this page
 # -----------------------------------------------------------------------------
 
-axes = {
-    "Survival / Welfare": ("self-preservation", "altruism"),
-    "Entitlement / Obligation": ("property-rights", "responsibility"),
-    "Even-split / Protection": ("reciprocity", "worker-dignity"),
-    "Sacred Life / Instrumental Life": ("sanctity-of-life", "utilitarian"),
-    "Legal Authority / Personal Agency": ("rule-of-law", "vigilantism"),
-    "Transcendent Norm / Pragmatism": ("religious-duty", "proportionality"),
-}
-
-dl_df_full = load_dilemmas()  # Load all dilemmas
+# Load run data (this stays the same)
 run_df_full = load_run()  # Load all run data
 
 # -----------------------------------------------------------------------------
 # Global top-bar tractate filter (shared between pages)
 # -----------------------------------------------------------------------------
-if not dl_df_full.empty and "tractate" in dl_df_full.columns:
-    tractate_options = ["All"] + sorted(dl_df_full["tractate"].unique())
-else:
-    tractate_options = ["All"]
-    st.warning(
-        "No tractate data found. Dilemma files may be missing in 'data/dilemmas/'."
-    )
-
-current_tract = st.session_state.get("sel_tractate", "All")
-if current_tract not in tractate_options:
-    current_tract = "All"
-
-sel_tractate = st.selectbox(
-    "Tractate",
-    tractate_options,
-    index=tractate_options.index(current_tract),
-    key="tractate_filter_comp",
-    help="Filter all charts by tractate",
-)
-
-# Persist selection for all pages
-st.session_state.sel_tractate = sel_tractate
 
 # -----------------------------------------------------------------------------
 # Dilemma Type Filter (synced with main page)
@@ -131,6 +118,38 @@ sel_dilemma_type = st.selectbox(
 
 # Persist selection for all pages
 st.session_state.sel_dilemma_type = sel_dilemma_type
+
+# Load dilemmas based on the selected dilemma type
+if sel_dilemma_type == "Neutral":
+    dl_df_full = load_dilemmas("neutral")
+elif sel_dilemma_type == "Original":
+    dl_df_full = load_dilemmas("original")
+else:  # "All" - default to original for display purposes
+    dl_df_full = load_dilemmas("original")
+
+# Set up tractate filter options based on loaded dilemmas
+if not dl_df_full.empty and "tractate" in dl_df_full.columns:
+    tractate_options = ["All"] + sorted(dl_df_full["tractate"].unique())
+else:
+    tractate_options = ["All"]
+    st.warning(
+        "No tractate data found. Dilemma files may be missing in 'data/dilemmas/'."
+    )
+
+current_tract = st.session_state.get("sel_tractate", "All")
+if current_tract not in tractate_options:
+    current_tract = "All"
+
+sel_tractate = st.selectbox(
+    "Tractate",
+    tractate_options,
+    index=tractate_options.index(current_tract),
+    key="tractate_filter_comp",
+    help="Filter all charts by tractate",
+)
+
+# Persist selection for all pages
+st.session_state.sel_tractate = sel_tractate
 
 # -----------------------------------------------------------------------------
 # Session State & Context Display
@@ -213,17 +232,17 @@ else:
 
         if not comp_df.empty:
             data = []
-            for axis, (left_tag, right_tag) in axes.items():
+            for axis, (left_tags, right_tags) in axes.items():
                 for mid_model_name in (model_a, model_b):
                     subset = comp_df[comp_df["model_name"] == mid_model_name]
                     current_axis_self_n = (
                         subset["chosen_value_labels"]
-                        .apply(lambda x: left_tag in x)
+                        .apply(lambda x: any(tag in x for tag in left_tags))
                         .sum()
                     )
                     current_axis_other_n = (
                         subset["chosen_value_labels"]
-                        .apply(lambda x: right_tag in x)
+                        .apply(lambda x: any(tag in x for tag in right_tags))
                         .sum()
                     )
                     # Calculate axis-specific invalid count
@@ -261,10 +280,10 @@ else:
 
                             # Check if the dilemma's options (A or B) have tags matching the current axis poles
                             if (
-                                (left_tag in tags_a)
-                                or (right_tag in tags_a)
-                                or (left_tag in tags_b)
-                                or (right_tag in tags_b)
+                                any(tag in tags_a for tag in left_tags)
+                                or any(tag in tags_a for tag in right_tags)
+                                or any(tag in tags_b for tag in left_tags)
+                                or any(tag in tags_b for tag in right_tags)
                             ):
                                 count_invalid_for_this_axis += 1
 
@@ -292,9 +311,13 @@ else:
                     axes_with_diff = [
                         ax for ax in diff.index if diff.loc[ax].abs().sum() > 0
                     ]
-                    table = pd.concat([pivot, diff], axis=1).sort_index(axis=1)
+                    
+                    # Reorder the pivot columns to respect model selection order (A then B)
+                    # But keep the original structure with invalid/self/other as top-level categories
+                    ordered_pivot = pivot.reindex(columns=[model_a, model_b], level=1)
+                    table = pd.concat([ordered_pivot, diff], axis=1)
 
-                    st.header(f"Aggregate Diff: {model_b} vs. {model_a}")
+                    st.header(f"Aggregate Diff: {model_a} → {model_b}")
 
                     with st.expander(
                         "ℹ️ Axis Legend: Self ↔ Other Poles", expanded=False
@@ -329,7 +352,7 @@ The "Other" pole focuses on the welfare, rights, or protection of another party,
                         table.style.format(precision=0), use_container_width=True
                     )
 
-                    fig_comp, ax_comp = plt.subplots(figsize=(5, 3))
+                    fig_comp, ax_comp = plt.subplots(figsize=(8, 3))
                     ax_comp.barh(
                         diff.index,
                         diff[("Δ", "other")],
@@ -343,8 +366,11 @@ The "Other" pole focuses on the welfare, rights, or protection of another party,
                         label="Self-leaning Δ",
                     )
                     ax_comp.axvline(0, color="k", linewidth=0.6)
-                    ax_comp.set_xlabel("Δ count (B – A)")
-                    ax_comp.legend()
+                    ax_comp.set_xlabel(f"Δ count ({model_b} – {model_a})")
+                    # Move legend to top with padding to avoid overlap with bars
+                    ax_comp.legend(bbox_to_anchor=(0.85, 1.15), loc='center', ncol=1)
+                    plt.tight_layout()
+                    plt.subplots_adjust(top=0.8)  # Add padding at the top
                     st.pyplot(fig_comp)
 
                     # --- DILEMMA-LEVEL DIFF TABLE START ---
@@ -375,15 +401,13 @@ The "Other" pole focuses on the welfare, rights, or protection of another party,
                             "B": option_b_tags_list,
                         }
 
-                    poles_for_dilemma_diff = {
-                        "self": [
-                            "self-preservation",
-                            "property-rights",
-                            "reciprocity",
-                            "privacy",
-                        ],
-                        "other": ["altruism", "responsibility", "worker-dignity"],
-                    }
+                    # Create comprehensive tag-to-pole mapping from shared_config.py axes
+                    tag_to_pole_info = {}
+                    for axis_name, (self_tags, other_tags) in axes.items():
+                        for tag in self_tags:
+                            tag_to_pole_info[tag] = ("self", axis_name)
+                        for tag in other_tags:
+                            tag_to_pole_info[tag] = ("other", axis_name)
 
                     if not comp_df.empty:
                         # Ensure no duplicates for pivot operation based on dilemma_id and model_name
@@ -400,21 +424,29 @@ The "Other" pole focuses on the welfare, rights, or protection of another party,
                             if not diff_q.empty:
 
                                 def get_pole_for_choice(choice_letter, dilemma_id):
+                                    if choice_letter == "INVALID":
+                                        return "invalid"
+
                                     tags_for_choice = letter_to_tags.get(
                                         dilemma_id, {}
                                     ).get(choice_letter, [])
-                                    if any(
-                                        t in poles_for_dilemma_diff["self"]
-                                        for t in tags_for_choice
-                                    ):
-                                        return "self"
-                                    if any(
-                                        t in poles_for_dilemma_diff["other"]
-                                        for t in tags_for_choice
-                                    ):
-                                        return "other"
-                                    if choice_letter == "INVALID":
-                                        return "invalid"
+
+                                    # Find the most specific pole match
+                                    pole_matches = []
+                                    for tag in tags_for_choice:
+                                        if tag in tag_to_pole_info:
+                                            pole_type, axis_name = tag_to_pole_info[tag]
+                                            pole_matches.append((pole_type, axis_name))
+
+                                    if pole_matches:
+                                        # If we have matches, use the first one (could be enhanced to handle multiple matches)
+                                        pole_type, axis_name = pole_matches[0]
+                                        # Create a more descriptive pole name
+                                        if pole_type == "self":
+                                            return f"self ({axis_name})"
+                                        else:
+                                            return f"other ({axis_name})"
+
                                     return "n/a"
 
                                 diff_q["Δ_pole_viz"] = [
@@ -508,11 +540,13 @@ The "Other" pole focuses on the welfare, rights, or protection of another party,
                                         "option_A_tags" in diff_q.columns
                                         and "option_B_tags" in diff_q.columns
                                     ):
-                                        axis_left_tag, axis_right_tag = axes[
+                                        axis_left_tags, axis_right_tags = axes[
                                             sel_axis_filter
                                         ]
 
-                                        def check_dilemma_axis_tags(row, l_tag, r_tag):
+                                        def check_dilemma_axis_tags(
+                                            row, l_tags, r_tags
+                                        ):
                                             tags_a_str = row.get("option_A_tags")
                                             tags_b_str = row.get("option_B_tags")
                                             tags_a = (
@@ -526,16 +560,16 @@ The "Other" pole focuses on the welfare, rights, or protection of another party,
                                                 else []
                                             )
                                             return (
-                                                (l_tag in tags_a)
-                                                or (r_tag in tags_a)
-                                                or (l_tag in tags_b)
-                                                or (r_tag in tags_b)
+                                                any(tag in tags_a for tag in l_tags)
+                                                or any(tag in tags_a for tag in r_tags)
+                                                or any(tag in tags_b for tag in l_tags)
+                                                or any(tag in tags_b for tag in r_tags)
                                             )
 
                                         diff_q = diff_q[
                                             diff_q.apply(
                                                 check_dilemma_axis_tags,
-                                                args=(axis_left_tag, axis_right_tag),
+                                                args=(axis_left_tags, axis_right_tags),
                                                 axis=1,
                                             )
                                         ]

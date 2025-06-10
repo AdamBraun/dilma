@@ -214,6 +214,88 @@ def _get_dilemma_files(base_path: pathlib.Path, recursive: bool) -> List[pathlib
     return dilemma_files
 
 
+def _get_checkpoint_path(
+    out_path: pathlib.Path, dilemma_type: str, file_stem: str
+) -> pathlib.Path:
+    """Generate the checkpoint file path for a given dilemma file."""
+    checkpoint_file_name = (
+        f"{out_path.stem}_checkpoint_{dilemma_type}_{file_stem}{out_path.suffix}"
+    )
+    return out_path.parent / checkpoint_file_name
+
+
+def _has_checkpoint(out_path: pathlib.Path, dilemma_type: str, file_stem: str) -> bool:
+    """Check if a checkpoint file already exists for a given dilemma file."""
+    checkpoint_path = _get_checkpoint_path(out_path, dilemma_type, file_stem)
+    return checkpoint_path.exists()
+
+
+def _filter_files_without_checkpoints(
+    dilemma_files: List[pathlib.Path], dilemma_type: str, out_path: pathlib.Path | None
+) -> tuple[List[pathlib.Path], List[pathlib.Path]]:
+    """Filter dilemma files, separating those with and without checkpoints."""
+    if not out_path:
+        return dilemma_files, []
+
+    files_to_process = []
+    files_with_checkpoints = []
+
+    for file_path in dilemma_files:
+        if _has_checkpoint(out_path, dilemma_type, file_path.stem):
+            files_with_checkpoints.append(file_path)
+        else:
+            files_to_process.append(file_path)
+
+    return files_to_process, files_with_checkpoints
+
+
+def _concatenate_checkpoints(out_path: pathlib.Path) -> int:
+    """Concatenate all checkpoint files into the final output file and clean up checkpoints."""
+    if not out_path:
+        return 0
+
+    checkpoint_pattern = f"{out_path.stem}_checkpoint_*{out_path.suffix}"
+    checkpoint_files = list(out_path.parent.glob(checkpoint_pattern))
+
+    if not checkpoint_files:
+        return 0
+
+    total_rows = 0
+    all_rows = []
+
+    # Read all checkpoint files
+    for checkpoint_file in sorted(checkpoint_files):
+        try:
+            for row_dict in iter_jsonl(checkpoint_file):
+                all_rows.append(row_dict)
+                total_rows += 1
+        except Exception as e:
+            print(
+                f"⚠️ Warning: Failed to read checkpoint {checkpoint_file}: {e}",
+                file=sys.stderr,
+            )
+
+    if all_rows:
+        # Write all rows to the final output file
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        with out_path.open("w", encoding="utf-8") as fh:
+            for row in all_rows:
+                fh.write(json.dumps(row, ensure_ascii=False) + "\n")
+
+        # Clean up checkpoint files
+        for checkpoint_file in checkpoint_files:
+            try:
+                checkpoint_file.unlink()
+                print(f"Removed checkpoint file: {checkpoint_file.name}")
+            except Exception as e:
+                print(
+                    f"⚠️ Warning: Failed to remove checkpoint {checkpoint_file}: {e}",
+                    file=sys.stderr,
+                )
+
+    return total_rows
+
+
 def _process_files(
     dilemma_files_list: List[pathlib.Path],
     dilemma_type: str,
@@ -292,8 +374,9 @@ def _process_files(
         # Checkpointing logic
         if args.out and not args.dry and current_file_out_rows:
             out_path = pathlib.Path(args.out)
-            checkpoint_file_name = f"{out_path.stem}_checkpoint_{dilemma_type}_{dilemmas_path.stem}{out_path.suffix}"
-            checkpoint_path = out_path.parent / checkpoint_file_name
+            checkpoint_path = _get_checkpoint_path(
+                out_path, dilemma_type, dilemmas_path.stem
+            )
             checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
             with checkpoint_path.open("w", encoding="utf-8") as fh_checkpoint:
                 for row in current_file_out_rows:
@@ -349,6 +432,31 @@ def run(args: argparse.Namespace) -> None:
         )
         neutral_dilemma_files = []
 
+    # Filter files based on existing checkpoints
+    out_path = pathlib.Path(args.out) if args.out else None
+
+    original_to_process, original_with_checkpoints = _filter_files_without_checkpoints(
+        original_dilemma_files, "original", out_path
+    )
+    neutral_to_process, neutral_with_checkpoints = _filter_files_without_checkpoints(
+        neutral_dilemma_files, "neutral", out_path
+    )
+
+    # Report on skipped files
+    if original_with_checkpoints:
+        print(
+            f"Skipping {len(original_with_checkpoints)} original files with existing checkpoints:"
+        )
+        for file_path in original_with_checkpoints:
+            print(f"  - {file_path.relative_to(ROOT)}")
+
+    if neutral_with_checkpoints:
+        print(
+            f"Skipping {len(neutral_with_checkpoints)} neutral files with existing checkpoints:"
+        )
+        for file_path in neutral_with_checkpoints:
+            print(f"  - {file_path.relative_to(ROOT)}")
+
     all_out_rows: List[Dict[str, Any]] = []
     grand_total_processed_dilemmas = 0
     grand_total_skipped_dilemmas = 0
@@ -361,8 +469,8 @@ def run(args: argparse.Namespace) -> None:
     }
     allowed_strengths = strength_map.get(args.strength)
 
-    # Process original dilemmas
-    if original_dilemma_files:
+    # Process original dilemmas (only those without checkpoints)
+    if original_to_process:
         print("\n--- Processing original dilemmas ---")
         (
             original_out_rows,
@@ -370,7 +478,7 @@ def run(args: argparse.Namespace) -> None:
             original_skipped,
             dry_run_print_counter,
         ) = _process_files(
-            original_dilemma_files,
+            original_to_process,
             "original",
             args,
             allowed_strengths,
@@ -380,8 +488,8 @@ def run(args: argparse.Namespace) -> None:
         grand_total_processed_dilemmas += original_processed
         grand_total_skipped_dilemmas += original_skipped
 
-    # Process neutral dilemmas
-    if neutral_dilemma_files:
+    # Process neutral dilemmas (only those without checkpoints)
+    if neutral_to_process:
         print("\n--- Processing neutral dilemmas ---")
         (
             neutral_out_rows,
@@ -389,7 +497,7 @@ def run(args: argparse.Namespace) -> None:
             neutral_skipped,
             dry_run_print_counter,  # Pass the updated counter
         ) = _process_files(
-            neutral_dilemma_files,
+            neutral_to_process,
             "neutral",
             args,
             allowed_strengths,
@@ -399,25 +507,59 @@ def run(args: argparse.Namespace) -> None:
         grand_total_processed_dilemmas += neutral_processed
         grand_total_skipped_dilemmas += neutral_skipped
 
-    total_files_processed = len(original_dilemma_files) + len(neutral_dilemma_files)
+    total_files_processed = len(original_to_process) + len(neutral_to_process)
+    total_files_skipped = len(original_with_checkpoints) + len(neutral_with_checkpoints)
 
-    if args.out:
-        out_path = pathlib.Path(args.out)
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        with out_path.open("w", encoding="utf-8") as fh:
-            for row in all_out_rows:  # Use all_out_rows
-                fh.write(json.dumps(row, ensure_ascii=False) + "\n")
+    # Concatenate all checkpoints into final output file
+    if args.out and not args.dry:
+        checkpoint_rows = _concatenate_checkpoints(pathlib.Path(args.out))
+        if checkpoint_rows > 0:
+            print(
+                f"Concatenated {checkpoint_rows} results from checkpoint files into final output"
+            )
+
+        # If we processed new files, we need to append them to the final output
+        if all_out_rows:
+            out_path = pathlib.Path(args.out)
+            # Read existing content if file exists
+            existing_rows = []
+            if out_path.exists():
+                try:
+                    existing_rows = list(iter_jsonl(out_path))
+                except Exception as e:
+                    print(
+                        f"⚠️ Warning: Failed to read existing output file: {e}",
+                        file=sys.stderr,
+                    )
+
+            # Combine existing and new rows
+            combined_rows = existing_rows + all_out_rows
+
+            # Write combined results
+            out_path.parent.mkdir(parents=True, exist_ok=True)
+            with out_path.open("w", encoding="utf-8") as fh:
+                for row in combined_rows:
+                    fh.write(json.dumps(row, ensure_ascii=False) + "\n")
+
+        total_results = checkpoint_rows + len(all_out_rows)
         print(
-            f"Saved {len(all_out_rows)} total results from {total_files_processed} file(s) → {out_path}"
+            f"Saved {total_results} total results from {total_files_processed} processed file(s) → {args.out}"
         )
+        if total_files_skipped > 0:
+            print(f"Skipped {total_files_skipped} file(s) with existing checkpoints")
     elif not args.dry:
         print(
             f"Processed {grand_total_processed_dilemmas} dilemmas from {total_files_processed} file(s). No --out path specified, results not saved."
         )
+        if total_files_skipped > 0:
+            print(f"Skipped {total_files_skipped} file(s) with existing checkpoints")
     else:  # Dry run, no output file
         print(
             f"Dry run complete. Processed {grand_total_processed_dilemmas} dilemmas from {total_files_processed} file(s)."
         )
+        if total_files_skipped > 0:
+            print(f"Would skip {total_files_skipped} file(s) with existing checkpoints")
+
     if grand_total_skipped_dilemmas > 0:
         print(
             f"Skipped a total of {grand_total_skipped_dilemmas} dilemmas due to strength filter."

@@ -115,3 +115,15 @@ tags:
     description: Consistent honesty and incorruptibility—actions match stated principles, free of corruption or deceit
   environmental-stewardship:
     description: Responsible use, protection, and restoration of natural resources and ecosystems for current and future generations
+  animal-welfare:
+    description: Humane treatment and protection of animals from unnecessary harm
+  respect:
+    description: Recognition of others' dignity through courteous and considerate behaviour
+  fiscal-responsibility:
+    description: Prudent, accountable stewardship of financial resources, avoiding waste or misuse
+  medical-care:
+    description: Ensuring access to adequate healthcare and treatment for those in need
+  social-cohesion:
+    description: Promoting harmony, solidarity, and a shared sense of belonging within a community
+  reputation:
+    description: Preserving or enhancing the good name and public standing of a person or group

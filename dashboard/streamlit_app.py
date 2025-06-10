@@ -25,6 +25,7 @@ from typing import Dict, List
 import pandas as pd
 import streamlit as st
 import matplotlib.pyplot as plt
+from shared_config import axes
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 DILEMMA_DIR = ROOT / "data" / "dilemmas"
@@ -86,16 +87,6 @@ def load_run() -> pd.DataFrame:
 # -----------------------------------------------------------------------------
 # Global Definitions & Initial Data Load
 # -----------------------------------------------------------------------------
-
-# Define the poles for each axis (used by Chart 2 on this page)
-axes = {
-    "Survival / Welfare": ("self-preservation", "altruism"),
-    "Entitlement / Obligation": ("property-rights", "responsibility"),
-    "Even-split / Protection": ("reciprocity", "worker-dignity"),
-    "Sacred Life / Instrumental Life": ("sanctity-of-life", "utilitarian"),
-    "Legal Authority / Personal Agency": ("rule-of-law", "vigilantism"),
-    "Transcendent Norm / Pragmatism": ("religious-duty", "proportionality"),
-}
 
 dl_df_full = load_dilemmas()  # Load all dilemmas, keep a full copy
 run_df_original = load_run()  # Keep original for full model lists
@@ -244,12 +235,27 @@ st.subheader("Bipolar axes: self ←  → other")
 
 # This chart also uses the page-specific filtered run_df
 rows = []
-for axis, (left_tag, right_tag) in axes.items():
-    left_cnt = run_df["chosen_value_labels"].apply(lambda x: left_tag in x).sum()
-    right_cnt = run_df["chosen_value_labels"].apply(lambda x: right_tag in x).sum()
+for axis, (left_tags, right_tags) in axes.items():
+    # Count how many rows have ANY of the left-leaning tags
+    left_cnt = (
+        run_df["chosen_value_labels"]
+        .apply(lambda x: any(tag in x for tag in left_tags))
+        .sum()
+    )
+    # Count how many rows have ANY of the right-leaning tags
+    right_cnt = (
+        run_df["chosen_value_labels"]
+        .apply(lambda x: any(tag in x for tag in right_tags))
+        .sum()
+    )
+    # Count invalid responses that don't have any left or right tags
     invalid_cnt = (
         run_df["chosen_value_labels"]
-        .apply(lambda x: "invalid" in x and left_tag not in x and right_tag not in x)
+        .apply(
+            lambda x: "invalid" in x
+            and not any(tag in x for tag in left_tags)
+            and not any(tag in x for tag in right_tags)
+        )
         .sum()
     )
     rows.append(
@@ -280,19 +286,53 @@ else:
         color="#999999",
         label="Invalid",
     )
-    for bars_collection in (left_bars, right_bars, invalid_bars):
-        for bar in bars_collection:
-            w = bar.get_width()
-            if w != 0:
-                ax.text(
-                    bar.get_x() + w / 2,
-                    bar.get_y() + bar.get_height() / 2,
-                    f"{abs(int(w))}",
-                    ha="center",
-                    va="center",
-                    fontsize=8,
-                    color="white",
-                )
+
+    # Add text labels with improved positioning and colors
+    for i, (left_bar, right_bar, invalid_bar) in enumerate(
+        zip(left_bars, right_bars, invalid_bars)
+    ):
+        # Left bars (self-leaning) - white text
+        left_w = left_bar.get_width()
+        if left_w != 0:
+            ax.text(
+                left_bar.get_x() + left_w / 2,
+                left_bar.get_y() + left_bar.get_height() / 2,
+                f"{abs(int(left_w))}",
+                ha="center",
+                va="center",
+                fontsize=8,
+                color="white",
+            )
+
+        # Right bars (other-leaning) - white text
+        right_w = right_bar.get_width()
+        if right_w != 0:
+            ax.text(
+                right_bar.get_x() + right_w / 2,
+                right_bar.get_y() + right_bar.get_height() / 2,
+                f"{abs(int(right_w))}",
+                ha="center",
+                va="center",
+                fontsize=8,
+                color="white",
+            )
+
+        # Invalid bars - black text positioned to the right of the bar
+        invalid_w = invalid_bar.get_width()
+        if invalid_w != 0:
+            # Position text to the right of the invalid bar with a small buffer
+            text_x = invalid_bar.get_x() + invalid_w + 0.3  # Small buffer from bar edge
+
+            ax.text(
+                text_x,
+                invalid_bar.get_y() + invalid_bar.get_height() / 2,
+                f"{abs(int(invalid_w))}",
+                ha="left",  # Left-align since text is positioned to the right of bar
+                va="center",
+                fontsize=8,
+                color="black",  # Black text for good contrast
+            )
+
     ax.axvline(0, color="black", linewidth=0.6)
     ax.set_xlabel("Count of answers")
     ax.legend(loc="upper right")
